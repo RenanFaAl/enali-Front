@@ -93,6 +93,7 @@ fun BarraLateral(
             icone = Icons.Default.List,
             estaSelecionado = (telaAtual == "ESTOQUE"),
             aoClicar = { aoMudarTela("ESTOQUE") }
+        )
             
        ItemMenuLateral(
             titulo = "Cliente",

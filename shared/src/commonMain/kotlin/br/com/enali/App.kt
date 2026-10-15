@@ -100,6 +100,9 @@ fun App() {
                             listaProdutos = listaDeProdutos.value,
                             aoSalvar = { novoEstoque ->
                                 listaDeEstoques.value = listaDeEstoques.value + novoEstoque
+                            }
+                        )
+                        
                         "CLIENTE" -> TelaFormularioCliente(
                             aoSalvar = { novoCliente ->
                                 listaDeClientes.value =
