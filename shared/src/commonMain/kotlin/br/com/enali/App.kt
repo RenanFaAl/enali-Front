@@ -1,3 +1,4 @@
+
 package br.com.enali
 
 import androidx.compose.foundation.background
@@ -8,6 +9,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import br.com.enali.model.Administrador
 import br.com.enali.model.Endereco
+import br.com.enali.model.Produto
+import br.com.enali.model.Estoque
+import br.com.enali.ui.components.BarraLateral
+import br.com.enali.ui.screens.TelaFormularioAdministrador
+import br.com.enali.ui.screens.TelaFormularioEndereco
+import br.com.enali.ui.screens.TelaFormularioProduto
+import br.com.enali.ui.screens.TelaFormularioEstoque
 import br.com.enali.model.Cliente
 import br.com.enali.model.Pedido
 import br.com.enali.ui.components.BarraLateral
@@ -26,6 +34,8 @@ fun App() {
 
     val listaDeAdministradores = remember { mutableStateOf(listOf<Administrador>()) }
     val listaDeEnderecos = remember { mutableStateOf(listOf<Endereco>()) }
+    val listaDeProdutos = remember { mutableStateOf(listOf<Produto>()) }
+    val listaDeEstoques = remember { mutableStateOf(listOf<Estoque>()) }
     val listaDeClientes = remember { mutableStateOf(listOf<Cliente>()) }
     val listaDePedidos = remember { mutableStateOf(listOf<Pedido>()) }
 
@@ -80,6 +90,16 @@ fun App() {
                             }
                         )
 
+                        "PRODUTO" -> TelaFormularioProduto(
+                            aoSalvar = { novoProduto ->
+                                listaDeProdutos.value = listaDeProdutos.value + novoProduto
+                            }
+                        )
+
+                        "ESTOQUE" -> TelaFormularioEstoque(
+                            listaProdutos = listaDeProdutos.value,
+                            aoSalvar = { novoEstoque ->
+                                listaDeEstoques.value = listaDeEstoques.value + novoEstoque
                         "CLIENTE" -> TelaFormularioCliente(
                             aoSalvar = { novoCliente ->
                                 listaDeClientes.value =
