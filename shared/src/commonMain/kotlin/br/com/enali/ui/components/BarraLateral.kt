@@ -16,9 +16,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.filled.ShoppingCart
 import br.com.enali.ui.theme.CorBegeMedio
 import br.com.enali.ui.theme.CorFundoClaro
 import br.com.enali.ui.theme.CorMarromEscuro
+
 
 @Composable
 fun ItemMenuLateral(
@@ -91,6 +93,19 @@ fun BarraLateral(
             icone = Icons.Default.List,
             estaSelecionado = (telaAtual == "ESTOQUE"),
             aoClicar = { aoMudarTela("ESTOQUE") }
+            
+       ItemMenuLateral(
+            titulo = "Cliente",
+            icone = Icons.Default.Person,
+            estaSelecionado = telaAtual == "CLIENTE",
+            aoClicar = { aoMudarTela("CLIENTE") }
+        )
+
+        ItemMenuLateral(
+            titulo = "Pedido",
+            icone = Icons.Default.ShoppingCart,
+            estaSelecionado = telaAtual == "PEDIDO",
+            aoClicar = { aoMudarTela("PEDIDO") }
         )
 
     }
