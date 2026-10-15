@@ -1,47 +1,79 @@
 package br.com.enali
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.safeContentPadding
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.painterResource
-
-import enalifront.shared.generated.resources.Res
-import enalifront.shared.generated.resources.compose_multiplatform
+import androidx.compose.ui.unit.dp
+import br.com.enali.model.Administrador
+import br.com.enali.model.Endereco
+import br.com.enali.ui.components.BarraLateral
+import br.com.enali.ui.screens.TelaFormularioAdministrador
+import br.com.enali.ui.screens.TelaFormularioEndereco
+import br.com.enali.ui.theme.CorBegeMedio
+import br.com.enali.ui.theme.CorFundoClaro
+import br.com.enali.ui.theme.CorMarromEscuro
 
 @Composable
-@Preview
 fun App() {
-    MaterialTheme {
-        var showContent by remember { mutableStateOf(false) }
-        Column(
-            modifier = Modifier
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .safeContentPadding()
-                .fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Button(onClick = { showContent = !showContent }) {
-                Text("Click me!")
-            }
-            AnimatedVisibility(showContent) {
-                val greeting = remember { Greeting().greet() }
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
+    var identificadorTelaAtual by remember { mutableStateOf("ADMINISTRADOR") }
+
+    val listaDeAdministradores = remember { mutableStateOf(listOf<Administrador>()) }
+    val listaDeEnderecos = remember { mutableStateOf(listOf<Endereco>()) }
+
+    MaterialTheme(
+        colorScheme = lightColorScheme(
+            primary = CorMarromEscuro,
+            secondary = CorBegeMedio,
+            background = CorFundoClaro,
+            surface = CorFundoClaro
+        )
+    ) {
+        Scaffold(
+            bottomBar = {
+                Surface(
+                    color = CorBegeMedio,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Image(painterResource(Res.drawable.compose_multiplatform), null)
-                    Text("Compose: $greeting")
+                    Text(
+                        text = "Sistema Enali",
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        color = CorMarromEscuro,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(CorFundoClaro)
+            ) {
+                BarraLateral(
+                    telaAtual = identificadorTelaAtual,
+                    aoMudarTela = { novaTela -> identificadorTelaAtual = novaTela }
+                )
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                ) {
+                    when (identificadorTelaAtual) {
+                        "ADMINISTRADOR" -> TelaFormularioAdministrador(
+                            aoSalvar = { novoAdmin ->
+                                listaDeAdministradores.value = listaDeAdministradores.value + novoAdmin
+                            }
+                        )
+
+                        "ENDERECO" -> TelaFormularioEndereco(
+                            aoSalvar = { novoEndereco ->
+                                listaDeEnderecos.value = listaDeEnderecos.value + novoEndereco
+                            }
+                        )
+
+                    }
                 }
             }
         }
