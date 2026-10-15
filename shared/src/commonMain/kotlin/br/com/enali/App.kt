@@ -1,3 +1,4 @@
+
 package br.com.enali
 
 import androidx.compose.foundation.background
@@ -8,19 +9,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import br.com.enali.model.Administrador
 import br.com.enali.model.Endereco
+import br.com.enali.model.Produto
+import br.com.enali.model.Estoque
 import br.com.enali.ui.components.BarraLateral
 import br.com.enali.ui.screens.TelaFormularioAdministrador
 import br.com.enali.ui.screens.TelaFormularioEndereco
+import br.com.enali.ui.screens.TelaFormularioProduto
+import br.com.enali.ui.screens.TelaFormularioEstoque
 import br.com.enali.ui.theme.CorBegeMedio
 import br.com.enali.ui.theme.CorFundoClaro
 import br.com.enali.ui.theme.CorMarromEscuro
 
 @Composable
 fun App() {
+
     var identificadorTelaAtual by remember { mutableStateOf("ADMINISTRADOR") }
 
     val listaDeAdministradores = remember { mutableStateOf(listOf<Administrador>()) }
     val listaDeEnderecos = remember { mutableStateOf(listOf<Endereco>()) }
+    val listaDeProdutos = remember { mutableStateOf(listOf<Produto>()) }
+    val listaDeEstoques = remember { mutableStateOf(listOf<Estoque>()) }
 
     MaterialTheme(
         colorScheme = lightColorScheme(
@@ -73,6 +81,18 @@ fun App() {
                             }
                         )
 
+                        "PRODUTO" -> TelaFormularioProduto(
+                            aoSalvar = { novoProduto ->
+                                listaDeProdutos.value = listaDeProdutos.value + novoProduto
+                            }
+                        )
+
+                        "ESTOQUE" -> TelaFormularioEstoque(
+                            listaProdutos = listaDeProdutos.value,
+                            aoSalvar = { novoEstoque ->
+                                listaDeEstoques.value = listaDeEstoques.value + novoEstoque
+                            }
+                        )
                     }
                 }
             }
