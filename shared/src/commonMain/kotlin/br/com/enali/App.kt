@@ -13,19 +13,21 @@ import br.com.enali.model.Pedido
 import br.com.enali.ui.components.BarraLateral
 import br.com.enali.ui.screens.TelaFormularioAdministrador
 import br.com.enali.ui.screens.TelaFormularioEndereco
+import br.com.enali.ui.screens.TelaFormularioCliente
+import br.com.enali.ui.screens.TelaFormularioPedido
 import br.com.enali.ui.theme.CorBegeMedio
 import br.com.enali.ui.theme.CorFundoClaro
 import br.com.enali.ui.theme.CorMarromEscuro
 
 @Composable
 fun App() {
+
     var identificadorTelaAtual by remember { mutableStateOf("ADMINISTRADOR") }
-    var identificadorTelaAtual by remember {mutableStateOf("CLIENTE")}
 
     val listaDeAdministradores = remember { mutableStateOf(listOf<Administrador>()) }
     val listaDeEnderecos = remember { mutableStateOf(listOf<Endereco>()) }
-    val listaDeClientes = remember {mutableStateOf(listOf<Cliente>())}
-    val listaDePedidos = remember {mutableStateOf(listOf<Pedido>())}
+    val listaDeClientes = remember { mutableStateOf(listOf<Cliente>()) }
+    val listaDePedidos = remember { mutableStateOf(listOf<Pedido>()) }
 
     MaterialTheme(
         colorScheme = lightColorScheme(
