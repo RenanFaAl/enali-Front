@@ -18,6 +18,10 @@ import br.com.enali.ui.screens.TelaFormularioProduto
 import br.com.enali.ui.screens.TelaFormularioEstoque
 import br.com.enali.model.Cliente
 import br.com.enali.model.Pedido
+import br.com.enali.model.Material
+import br.com.enali.model.Fornecedor
+import br.com.enali.ui.screens.TelaFormularioMaterial
+import br.com.enali.ui.screens.TelaFormularioFornecedor
 import br.com.enali.ui.components.BarraLateral
 import br.com.enali.ui.screens.TelaFormularioAdministrador
 import br.com.enali.ui.screens.TelaFormularioEndereco
@@ -38,6 +42,8 @@ fun App() {
     val listaDeEstoques = remember { mutableStateOf(listOf<Estoque>()) }
     val listaDeClientes = remember { mutableStateOf(listOf<Cliente>()) }
     val listaDePedidos = remember { mutableStateOf(listOf<Pedido>()) }
+    val listaDeMateriais = remember { mutableStateOf(listOf<Material>()) }
+    val listaDeFornecedores = remember { mutableStateOf(listOf<Fornecedor>()) }
 
     MaterialTheme(
         colorScheme = lightColorScheme(
@@ -114,6 +120,20 @@ fun App() {
                             aoSalvar = { novoPedido ->
                                 listaDePedidos.value =
                                     listaDePedidos.value + novoPedido
+                            }
+                        )
+
+                        "MATERIAL" -> TelaFormularioMaterial(
+                            aoSalvar = { novoMaterial ->
+                                listaDeMateriais.value =
+                                    listaDeMateriais.value + novoMaterial
+                            }
+                        )
+
+                        "FORNECEDOR" -> TelaFormularioFornecedor(
+                            aoSalvar = { novoFornecedor ->
+                                listaDeFornecedores.value =
+                                    listaDeFornecedores.value + novoFornecedor
                             }
                         )
                     }

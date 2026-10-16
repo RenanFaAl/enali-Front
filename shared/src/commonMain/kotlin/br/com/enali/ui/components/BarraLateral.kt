@@ -9,6 +9,9 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -104,9 +107,23 @@ fun BarraLateral(
 
         ItemMenuLateral(
             titulo = "Pedido",
-            icone = Icons.Default.ShoppingCart,
+            icone = Icons.Default.Receipt,
             estaSelecionado = telaAtual == "PEDIDO",
             aoClicar = { aoMudarTela("PEDIDO") }
+        )
+
+        ItemMenuLateral(
+            titulo = "Material",
+            icone = Icons.Default.Build,
+            estaSelecionado = telaAtual == "MATERIAL",
+            aoClicar = { aoMudarTela("MATERIAL") }
+        )
+
+        ItemMenuLateral(
+            titulo = "Fornecedor",
+            icone = Icons.Default.LocalShipping,
+            estaSelecionado = telaAtual == "FORNECEDOR",
+            aoClicar = { aoMudarTela("FORNECEDOR") }
         )
 
     }

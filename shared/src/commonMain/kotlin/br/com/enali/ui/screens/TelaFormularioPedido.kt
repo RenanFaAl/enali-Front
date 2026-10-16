@@ -1,142 +1,244 @@
-
 package br.com.enali.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import br.com.enali.model.Pedido
+import br.com.enali.ui.components.CampoTextoCustomizado
+import br.com.enali.ui.theme.CorBranco
+import br.com.enali.ui.theme.CorMarromEscuro
+import kotlin.random.Random
 
 @Composable
 fun TelaFormularioPedido(
     aoSalvar: (Pedido) -> Unit
 ) {
     var numeroPedido by remember { mutableStateOf("") }
-    var valorTotal by remember { mutableStateOf("") }
+    var valorTotalPedido by remember { mutableStateOf("") }
     var dataPedido by remember { mutableStateOf("") }
-    var status by remember { mutableStateOf("PENDENTE") }
-    var observacoes by remember { mutableStateOf("") }
-    var mensagem by remember { mutableStateOf("") }
+    var statusPedido by remember { mutableStateOf("PENDENTE") }
+    var observacoesPedido by remember { mutableStateOf("") }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Text(
-            text = "Cadastro de Pedido",
-            style = MaterialTheme.typography.headlineMedium
-        )
+    var erroNumero by remember { mutableStateOf<String?>(null) }
+    var erroValorTotal by remember { mutableStateOf<String?>(null) }
+    var erroData by remember { mutableStateOf<String?>(null) }
+    var erroStatus by remember { mutableStateOf<String?>(null) }
+    var erroObservacoes by remember { mutableStateOf<String?>(null) }
+    var mensagemSucesso by remember { mutableStateOf<String?>(null) }
 
-        OutlinedTextField(
-            value = numeroPedido,
-            onValueChange = { numeroPedido = it },
-            label = { Text("Número do pedido") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-        )
+    val regexDataHora = Regex("""^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$""")
 
-        OutlinedTextField(
-            value = valorTotal,
-            onValueChange = { valorTotal = it },
-            label = { Text("Valor total") },
-            placeholder = { Text("Ex.: 199.90") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-        )
+    val limparCampos = {
+        numeroPedido = ""
+        valorTotalPedido = ""
+        dataPedido = ""
+        statusPedido = "PENDENTE"
+        observacoesPedido = ""
+        erroNumero = null
+        erroValorTotal = null
+        erroData = null
+        erroStatus = null
+        erroObservacoes = null
+    }
 
-        OutlinedTextField(
-            value = dataPedido,
-            onValueChange = { dataPedido = it },
-            label = { Text("Data e hora do pedido") },
-            placeholder = { Text("AAAA-MM-DDTHH:mm:ss") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-        )
+    val gravarPedido = {
+        val valorTotal = valorTotalPedido.trim().replace(",", ".").toDoubleOrNull()
 
-        OutlinedTextField(
-            value = status,
-            onValueChange = { status = it },
-            label = { Text("Status") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-        )
+        erroNumero = if (numeroPedido.isBlank()) "O número do pedido é obrigatório" else null
 
-        OutlinedTextField(
-            value = observacoes,
-            onValueChange = { observacoes = it },
-            label = { Text("Observações") },
-            modifier = Modifier.fillMaxWidth(),
-            minLines = 3
-        )
-
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(
-                onClick = {
-                    val valor = valorTotal
-                        .trim()
-                        .replace(',', '.')
-                        .toDoubleOrNull()
-
-                    mensagem = when {
-                        numeroPedido.isBlank() ->
-                            "Informe o número do pedido."
-
-                        valor == null || !valor.isFinite() || valor <= 0.0 ->
-                            "Informe um valor total válido e maior que zero."
-
-                        !Regex(
-                            """\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}"""
-                        ).matches(dataPedido) ->
-                            "Informe a data no formato AAAA-MM-DDTHH:mm:ss."
-
-                        status.isBlank() ->
-                            "Informe o status do pedido."
-
-                        observacoes.length > 500 ->
-                            "As observações devem ter até 500 caracteres."
-
-                        else -> {
-                            aoSalvar(
-                                Pedido(
-                                    numeroPedido = numeroPedido.trim(),
-                                    valorTotal = valor,
-                                    dataPedido = dataPedido,
-                                    status = status.trim(),
-                                    observacoes = observacoes
-                                        .trim()
-                                        .ifBlank { null }
-                                )
-                            )
-                            "Pedido adicionado à lista."
-                        }
-                    }
-                }
-            ) {
-                Text("Gravar")
-            }
-
-            OutlinedButton(
-                onClick = {
-                    numeroPedido = ""
-                    valorTotal = ""
-                    dataPedido = ""
-                    status = "PENDENTE"
-                    observacoes = ""
-                    mensagem = ""
-                }
-            ) {
-                Text("Limpar Campos")
-            }
+        erroValorTotal = when {
+            valorTotalPedido.isBlank() -> "O valor total é obrigatório"
+            valorTotal == null || !valorTotal.isFinite() -> "Informe um valor total válido"
+            valorTotal <= 0.0 -> "O valor total deve ser maior que zero"
+            else -> null
         }
 
-        if (mensagem.isNotBlank()) {
-            Text(mensagem)
+        erroData = when {
+            dataPedido.isBlank() -> "A data do pedido é obrigatória"
+            !regexDataHora.matches(dataPedido.trim()) -> "Use a data no formato AAAA-MM-DDTHH:mm:ss"
+            else -> null
+        }
+
+        erroStatus = if (statusPedido.isBlank()) "O status é obrigatório" else null
+
+        erroObservacoes = if (observacoesPedido.length > 500) {
+            "As observações devem ter no máximo 500 caracteres"
+        } else null
+
+        if (
+            erroNumero == null &&
+            erroValorTotal == null &&
+            erroData == null &&
+            erroStatus == null &&
+            erroObservacoes == null &&
+            valorTotal != null
+        ) {
+            val novoPedido = Pedido(
+                id = Random.nextLong(1000L, 999999L),
+                numeroPedido = numeroPedido.trim(),
+                valorTotal = valorTotal,
+                dataPedido = dataPedido.trim(),
+                status = statusPedido.trim().uppercase(),
+                observacoes = observacoesPedido.trim().ifBlank { null }
+            )
+
+            aoSalvar(novoPedido)
+            mensagemSucesso = "Pedido cadastrado com sucesso!"
+            limparCampos()
+        } else {
+            mensagemSucesso = null
+        }
+    }
+
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(CorBranco)
+            .padding(16.dp)
+    ) {
+        val larguraMaxima = if (maxWidth > 600.dp) 550.dp else maxWidth
+
+        Column(
+            modifier = Modifier
+                .widthIn(max = larguraMaxima)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .align(Alignment.TopCenter)
+        ) {
+            Text(
+                text = "Formulário de Cadastro de Pedido",
+                style = MaterialTheme.typography.titleLarge,
+                color = CorMarromEscuro
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            mensagemSucesso?.let { sucesso ->
+                Surface(
+                    color = Color(0xFFE8F5E9),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text(
+                        text = sucesso,
+                        color = Color(0xFF2E7D32),
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
+
+            CampoTextoCustomizado(
+                value = numeroPedido,
+                onValueChange = {
+                    numeroPedido = it
+                    erroNumero = null
+                },
+                label = "Número do Pedido",
+                placeholder = "PED-0001",
+                isError = erroNumero != null
+            )
+
+            erroNumero?.let {
+                Text(it, color = MaterialTheme.colorScheme.error)
+            }
+
+            CampoTextoCustomizado(
+                value = valorTotalPedido,
+                onValueChange = {
+                    valorTotalPedido = it
+                    erroValorTotal = null
+                },
+                label = "Valor Total",
+                placeholder = "199,90",
+                isError = erroValorTotal != null
+            )
+
+            erroValorTotal?.let {
+                Text(it, color = MaterialTheme.colorScheme.error)
+            }
+
+            CampoTextoCustomizado(
+                value = dataPedido,
+                onValueChange = {
+                    dataPedido = it
+                    erroData = null
+                },
+                label = "Data e Hora do Pedido",
+                placeholder = "AAAA-MM-DDTHH:mm:ss",
+                isError = erroData != null
+            )
+
+            erroData?.let {
+                Text(it, color = MaterialTheme.colorScheme.error)
+            }
+
+            CampoTextoCustomizado(
+                value = statusPedido,
+                onValueChange = {
+                    statusPedido = it
+                    erroStatus = null
+                },
+                label = "Status",
+                placeholder = "PENDENTE",
+                isError = erroStatus != null
+            )
+
+            erroStatus?.let {
+                Text(it, color = MaterialTheme.colorScheme.error)
+            }
+
+            CampoTextoCustomizado(
+                value = observacoesPedido,
+                onValueChange = {
+                    observacoesPedido = it
+                    erroObservacoes = null
+                },
+                label = "Observações (opcional)",
+                placeholder = "Entregar no período da tarde",
+                isError = erroObservacoes != null
+            )
+
+            erroObservacoes?.let {
+                Text(it, color = MaterialTheme.colorScheme.error)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Button(
+                    onClick = gravarPedido,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = CorMarromEscuro
+                    ),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Gravar", color = CorBranco)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        limparCampos()
+                        mensagemSucesso = null
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Limpar Campos")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(36.dp))
         }
     }
 }
