@@ -116,7 +116,7 @@ fun TelaFormularioAdministrador(
             }
         }
     }
-    
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()

@@ -8,7 +8,15 @@ data class ClienteCadastroRequest(
     val email: String,
     val senha: String,
     val cpf: String,
-    val dataNascimento: String // Formato ISO: "AAAA-MM-DD"
+    val dataNascimento: String
+)
+
+@Serializable
+data class ClienteAtualizarRequest(
+    val nome: String,
+    val email: String,
+    val cpf: String,
+    val dataNascimento: String
 )
 
 @Serializable

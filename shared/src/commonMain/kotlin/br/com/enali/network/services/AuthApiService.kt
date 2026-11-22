@@ -1,5 +1,6 @@
-package br.com.enali.network.auth
+package br.com.enali.network.services
 
+import br.com.enali.network.EnaliConfig
 import br.com.enali.network.EnaliHttpClientFactory
 import br.com.enali.network.dto.AuthLoginRequest
 import br.com.enali.network.dto.AuthLoginResponse
@@ -9,23 +10,13 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
-import io.ktor.http.isSuccess
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 class AuthApiService(
     private val httpClient: HttpClient,
-    private val baseUrl: String = "http://localhost:8080"
+    private val baseUrl: String = EnaliConfig.BASE_URL
 ) {
-    private val jsonParser = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-    }
-
     suspend fun loginCliente(email: String, senha: String): Result<AuthLoginResponse> =
         postLogin("$baseUrl/auth/cliente/signin", email, senha)
 
@@ -38,12 +29,7 @@ class AuthApiService(
                 contentType(ContentType.Application.Json)
                 setBody(request)
             }
-            if (!response.status.isSuccess()) {
-                val corpoErro = response.bodyAsText()
-                val mensagemApi = extrairMensagemDaApi(corpoErro)
-                    ?: corpoErro.ifBlank { "Erro HTTP ${response.status.value}" }
-                error(mensagemApi)
-            }
+            EnaliHttpClientFactory.validarResposta(response)
             response.body<ClientePerfilResponse>()
         }
 
@@ -56,25 +42,7 @@ class AuthApiService(
             contentType(ContentType.Application.Json)
             setBody(AuthLoginRequest(email = email.trim(), senha = senha))
         }
-
-        if (!response.status.isSuccess()) {
-            val corpoErro = response.bodyAsText()
-            val mensagemApi = extrairMensagemDaApi(corpoErro)
-                ?: corpoErro.ifBlank { "Erro HTTP ${response.status.value}" }
-            error(mensagemApi)
-        }
-
+        EnaliHttpClientFactory.validarResposta(response)
         response.body<AuthLoginResponse>()
-    }
-
-    private fun extrairMensagemDaApi(corpo: String): String? {
-        if (corpo.isBlank()) return null
-        return runCatching {
-            val obj = jsonParser.parseToJsonElement(corpo).jsonObject
-            listOf("mensagem", "message", "error", "erro", "detail")
-                .firstNotNullOfOrNull { chave ->
-                    obj[chave]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-                }
-        }.getOrNull()
     }
 }

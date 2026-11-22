@@ -10,6 +10,12 @@ data class AdminCadastroRequest(
 )
 
 @Serializable
+data class AdminAtualizarRequest(
+    val nome: String,
+    val email: String
+)
+
+@Serializable
 data class AdminPerfilResponse(
     val id: Long,
     val nome: String,

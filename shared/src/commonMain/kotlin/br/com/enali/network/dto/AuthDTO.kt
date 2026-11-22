@@ -18,3 +18,10 @@ data class AuthLoginResponse(
     val nivelAcesso: String? = null,
     val tipoUsuario: String
 )
+
+@Serializable
+data class AlterarSenhaRequest(
+    val senhaAtual: String,
+    val senhaNova: String,
+    val confirmarSenha: String
+)

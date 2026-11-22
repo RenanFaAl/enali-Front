@@ -4,11 +4,20 @@ import io.ktor.client.HttpClient
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.ServerResponseException
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 object EnaliHttpClientFactory {
+    private val jsonParser = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+    }
+
     fun criar(): HttpClient = HttpClient {
         install(ContentNegotiation) {
             json(
@@ -18,6 +27,26 @@ object EnaliHttpClientFactory {
                 }
             )
         }
+    }
+
+    suspend fun validarResposta(response: HttpResponse) {
+        if (!response.status.isSuccess()) {
+            val corpoErro = response.bodyAsText()
+            val mensagemApi = extrairMensagemDaApi(corpoErro)
+                ?: corpoErro.ifBlank { "Erro HTTP ${response.status.value}" }
+            error(mensagemApi)
+        }
+    }
+
+    fun extrairMensagemDaApi(corpo: String): String? {
+        if (corpo.isBlank()) return null
+        return runCatching {
+            val obj = jsonParser.parseToJsonElement(corpo).jsonObject
+            listOf("mensagem", "message", "error", "erro", "detail")
+                .firstNotNullOfOrNull { chave ->
+                    obj[chave]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+                }
+        }.getOrNull()
     }
 
     suspend fun <T> executarRequisicao(

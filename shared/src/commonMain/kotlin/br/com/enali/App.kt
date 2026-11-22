@@ -25,7 +25,7 @@ import br.com.enali.ui.theme.CorMarromEscuro
 
 @Composable
 fun App() {
-    val apiClient = remember { EnaliApiClient(baseUrl = "http://localhost:8080") }
+    val apiClient = remember { EnaliApiClient() }
     DisposableEffect(apiClient) {
         onDispose { apiClient.fechar() }
     }
@@ -169,12 +169,43 @@ fun App() {
                                 modifier = Modifier.padding(24.dp)
                             )
 
-                            "MEUS_PEDIDOS", "MEUS_ENDERECOS", "MEU_CADASTRO", "MEU_PERFIL_ADMIN" -> Text(
+                            "MEUS_PEDIDOS", "MEUS_ENDERECOS" -> Text(
                                 text = "Área: $identificadorTelaAtual",
                                 color = CorMarromEscuro,
                                 style = MaterialTheme.typography.headlineSmall,
                                 modifier = Modifier.padding(24.dp)
                             )
+
+                            "MEU_CADASTRO" -> {
+                                val s = sessao as? SessaoUsuario.ClienteLogado
+                                if (s != null) {
+                                    TelaPerfilCliente(
+                                        apiClient = apiClient,
+                                        token = s.token,
+                                        nomeInicial = s.nome,
+                                        emailInicial = s.email,
+                                        aoAtualizarNomeSessao = { novoNome ->
+                                            sessao = s.copy(nome = novoNome)
+                                        }
+                                    )
+                                }
+                            }
+
+                            "MEU_PERFIL_ADMIN" -> {
+                                val s = sessao as? SessaoUsuario.AdminLogado
+                                if (s != null) {
+                                    TelaPerfilAdmin(
+                                        apiClient = apiClient,
+                                        token = s.token,
+                                        nomeInicial = s.nome,
+                                        emailInicial = s.email,
+                                        nivelAcessoInicial = s.nivelAcesso,
+                                        aoAtualizarNomeSessao = { novoNome ->
+                                            sessao = s.copy(nome = novoNome)
+                                        }
+                                    )
+                                }
+                            }
 
                             "ADMINISTRADOR" -> {
                                 val sessaoAdmin = sessao as? SessaoUsuario.AdminLogado
