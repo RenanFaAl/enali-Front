@@ -1,4 +1,3 @@
-
 package br.com.enali.ui.components
 
 import androidx.compose.foundation.background
@@ -8,23 +7,39 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.Login
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import br.com.enali.auth.SessaoUsuario
 import br.com.enali.ui.theme.CorBegeMedio
 import br.com.enali.ui.theme.CorBranco
 import br.com.enali.ui.theme.CorMarromEscuro
+
+private data class ItemMenuConfig(
+    val rota: String,
+    val titulo: String,
+    val icone: ImageVector
+)
 
 @Composable
 fun ItemMenuLateral(
@@ -87,11 +102,7 @@ fun ItemMenuLateral(
                 titulo,
                 color = corTexto,
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (estaSelecionado) {
-                    FontWeight.SemiBold
-                } else {
-                    FontWeight.Normal
-                }
+                fontWeight = if (estaSelecionado) FontWeight.SemiBold else FontWeight.Normal
             )
         }
     }
@@ -99,10 +110,44 @@ fun ItemMenuLateral(
 
 @Composable
 fun BarraLateral(
+    sessao: SessaoUsuario,
     telaAtual: String,
     aoMudarTela: (String) -> Unit,
+    aoSair: () -> Unit,
+    aoAbrirLoginAdminDiscreto: () -> Unit = {},
     compacto: Boolean = false
 ) {
+    var toquesLogo by remember { mutableIntStateOf(0) }
+
+    val itens = when (sessao) {
+        is SessaoUsuario.Visitante -> listOf(
+            ItemMenuConfig("VITRINE", "Vitrine", Icons.Default.Storefront),
+            ItemMenuConfig("CARRINHO", "Carrinho", Icons.Default.ShoppingCart),
+            ItemMenuConfig("LOGIN_CLIENTE", "Entrar", Icons.AutoMirrored.Filled.Login)
+        )
+
+        is SessaoUsuario.ClienteLogado -> listOf(
+            ItemMenuConfig("VITRINE", "Vitrine", Icons.Default.Storefront),
+            ItemMenuConfig("CARRINHO", "Carrinho", Icons.Default.ShoppingCart),
+            ItemMenuConfig("MEUS_PEDIDOS", "Pedidos", Icons.Default.ShoppingBag),
+            ItemMenuConfig("MEUS_ENDERECOS", "Endereços", Icons.Default.LocationOn),
+            ItemMenuConfig("MEU_CADASTRO", "Meu Perfil", Icons.Default.Person)
+        )
+
+        is SessaoUsuario.AdminLogado -> buildList {
+            add(ItemMenuConfig("PRODUTO", "Produto", Icons.Default.ShoppingCart))
+            add(ItemMenuConfig("ESTOQUE", "Estoque", Icons.Default.List))
+            add(ItemMenuConfig("PEDIDO", "Pedidos", Icons.Default.Receipt))
+            add(ItemMenuConfig("MATERIAL", "Material", Icons.Default.Build))
+            add(ItemMenuConfig("FORNECEDOR", "Fornecedor", Icons.Default.LocalShipping))
+            add(ItemMenuConfig("ENDERECO", "Endereços", Icons.Default.LocationOn))
+            if (sessao.isMaster) {
+                add(ItemMenuConfig("ADMINISTRADOR", "Admins", Icons.Default.AdminPanelSettings))
+            }
+            add(ItemMenuConfig("MEU_PERFIL_ADMIN", "Meu Perfil", Icons.Default.Person))
+        }
+    }
+
     Column(
         modifier = Modifier
             .width(if (compacto) 86.dp else 194.dp)
@@ -120,7 +165,15 @@ fun BarraLateral(
             },
             fontWeight = FontWeight.Bold,
             color = CorBranco,
-            modifier = Modifier.padding(top = 24.dp, bottom = 22.dp)
+            modifier = Modifier
+                .padding(top = 24.dp, bottom = 22.dp)
+                .clickable(enabled = sessao is SessaoUsuario.Visitante) {
+                    toquesLogo += 1
+                    if (toquesLogo >= 5) {
+                        toquesLogo = 0
+                        aoAbrirLoginAdminDiscreto()
+                    }
+                }
         )
 
         HorizontalDivider(
@@ -129,62 +182,31 @@ fun BarraLateral(
         )
         Spacer(Modifier.height(12.dp))
 
-        ItemMenuLateral(
-            "Admin",
-            Icons.Default.Person,
-            telaAtual == "ADMINISTRADOR",
-            { aoMudarTela("ADMINISTRADOR") },
-            compacto
-        )
-        ItemMenuLateral(
-            "Endereço",
-            Icons.Default.LocationOn,
-            telaAtual == "ENDERECO",
-            { aoMudarTela("ENDERECO") },
-            compacto
-        )
-        ItemMenuLateral(
-            "Produto",
-            Icons.Default.ShoppingCart,
-            telaAtual == "PRODUTO",
-            { aoMudarTela("PRODUTO") },
-            compacto
-        )
-        ItemMenuLateral(
-            "Estoque",
-            Icons.Default.List,
-            telaAtual == "ESTOQUE",
-            { aoMudarTela("ESTOQUE") },
-            compacto
-        )
-        ItemMenuLateral(
-            "Cliente",
-            Icons.Default.Person,
-            telaAtual == "CLIENTE",
-            { aoMudarTela("CLIENTE") },
-            compacto
-        )
-        ItemMenuLateral(
-            "Pedido",
-            Icons.Default.Receipt,
-            telaAtual == "PEDIDO",
-            { aoMudarTela("PEDIDO") },
-            compacto
-        )
-        ItemMenuLateral(
-            "Material",
-            Icons.Default.Build,
-            telaAtual == "MATERIAL",
-            { aoMudarTela("MATERIAL") },
-            compacto
-        )
-        ItemMenuLateral(
-            "Fornecedor",
-            Icons.Default.LocalShipping,
-            telaAtual == "FORNECEDOR",
-            { aoMudarTela("FORNECEDOR") },
-            compacto
-        )
+        itens.forEach { item ->
+            ItemMenuLateral(
+                titulo = item.titulo,
+                icone = item.icone,
+                estaSelecionado = telaAtual == item.rota,
+                aoClicar = { aoMudarTela(item.rota) },
+                compacto = compacto
+            )
+        }
+
+        if (sessao !is SessaoUsuario.Visitante) {
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 14.dp),
+                color = CorBegeMedio.copy(alpha = 0.35f)
+            )
+            Spacer(Modifier.height(8.dp))
+            ItemMenuLateral(
+                titulo = "Sair",
+                icone = Icons.AutoMirrored.Filled.ExitToApp,
+                estaSelecionado = false,
+                aoClicar = aoSair,
+                compacto = compacto
+            )
+        }
 
         Spacer(Modifier.height(18.dp))
     }
