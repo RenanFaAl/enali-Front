@@ -12,65 +12,108 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import br.com.enali.model.Administrador
+import br.com.enali.network.EnaliApiClient
+import br.com.enali.network.dto.AdminCadastroRequest
 import br.com.enali.ui.components.CampoTextoCustomizado
 import br.com.enali.ui.theme.CorBranco
 import br.com.enali.ui.theme.CorMarromEscuro
-import kotlin.random.Random
+import kotlinx.coroutines.launch
 
 @Composable
 fun TelaFormularioAdministrador(
-    aoSalvar: (Administrador) -> Unit
+    apiClient: EnaliApiClient,
+    tokenAdmin: String,
+    isAdminMaster: Boolean,
+    aoSalvar: (Administrador) -> Unit = {}
 ) {
+    val escopo = rememberCoroutineScope()
+
     var nomeAdministrador by remember { mutableStateOf("") }
     var emailAdministrador by remember { mutableStateOf("") }
     var senhaAdministrador by remember { mutableStateOf("") }
-    var nivelAcessoAdministrador by remember { mutableStateOf("ADMIN_COMUM") }
-    var estaAtivo by remember { mutableStateOf(true) }
-    var dataCriacaoAdministrador by remember { mutableStateOf("") }
 
     var erroNome by remember { mutableStateOf<String?>(null) }
     var erroEmail by remember { mutableStateOf<String?>(null) }
     var erroSenha by remember { mutableStateOf<String?>(null) }
-    var erroNivelAcesso by remember { mutableStateOf<String?>(null) }
-    var erroDataCriacao by remember { mutableStateOf<String?>(null) }
+    var erroApi by remember { mutableStateOf<String?>(null) }
     var mensagemSucesso by remember { mutableStateOf<String?>(null) }
+    var carregando by remember { mutableStateOf(false) }
+
+    val regexEmail = remember { Regex("""^[\w.+-]+@[\w-]+(\.[\w-]+)+$""") }
+    val regexSenhaForte = remember {
+        Regex("""^(?=\S*[A-Z])(?=\S*[a-z])(?=\S*\d)(?=\S*[^A-Za-z0-9\s])\S+$""")
+    }
 
     val limparCampos = {
         nomeAdministrador = ""
         emailAdministrador = ""
         senhaAdministrador = ""
-        nivelAcessoAdministrador = "ADMIN_COMUM"
-        estaAtivo = true
-        dataCriacaoAdministrador = ""
         erroNome = null
         erroEmail = null
         erroSenha = null
-        erroNivelAcesso = null
-        erroDataCriacao = null
+        erroApi = null
     }
 
     val gravarAdministrador = {
-        erroNome = if (nomeAdministrador.isBlank()) "O nome é obrigatório" else null
-        erroEmail = if (emailAdministrador.isBlank()) "O e-mail é obrigatório" else null
-        erroSenha = if (senhaAdministrador.isBlank()) "A senha é obrigatória" else null
-        erroNivelAcesso = if (nivelAcessoAdministrador.isBlank()) "O nível de acesso é obrigatório" else null
-        erroDataCriacao = if (dataCriacaoAdministrador.isBlank()) "A data de criação é obrigatória" else null
-
-        if (erroNome == null && erroEmail == null && erroSenha == null && erroNivelAcesso == null && erroDataCriacao == null) {
-            val novoAdministrador = Administrador(
-                id = Random.nextLong(1000L, 999999L),
-                nome = nomeAdministrador,
-                email = emailAdministrador,
-                senha = senhaAdministrador,
-                ativo = estaAtivo,
-                nivelAcesso = nivelAcessoAdministrador,
-                dataCriacao = dataCriacaoAdministrador
-            )
-            aoSalvar(novoAdministrador)
-            mensagemSucesso = "Administrador ${novoAdministrador.nome} criado com sucesso!"
-            limparCampos()
+        if (!isAdminMaster) {
+            erroApi = "Apenas um Admin Master pode cadastrar novos administradores."
         } else {
+            erroNome = when {
+                nomeAdministrador.isBlank() -> "O nome é obrigatório"
+                nomeAdministrador.trim().length < 2 || nomeAdministrador.trim().length > 150 ->
+                    "O nome deve ter entre 2 e 150 caracteres"
+                else -> null
+            }
+
+            erroEmail = when {
+                emailAdministrador.isBlank() -> "O e-mail é obrigatório"
+                emailAdministrador.trim().length > 254 -> "O e-mail deve ter no máximo 254 caracteres"
+                !regexEmail.matches(emailAdministrador.trim()) -> "Informe um e-mail válido"
+                else -> null
+            }
+
+            erroSenha = when {
+                senhaAdministrador.isBlank() -> "A senha é obrigatória"
+                senhaAdministrador.length < 8 || senhaAdministrador.length > 254 ->
+                    "A senha deve ter entre 8 e 254 caracteres"
+                !regexSenhaForte.matches(senhaAdministrador) ->
+                    "Use maiúscula, minúscula, número e caractere especial, sem espaços"
+                else -> null
+            }
+
+            erroApi = null
             mensagemSucesso = null
+
+            if (erroNome == null && erroEmail == null && erroSenha == null && !carregando) {
+                carregando = true
+                val request = AdminCadastroRequest(
+                    nome = nomeAdministrador.trim(),
+                    email = emailAdministrador.trim().lowercase(),
+                    senha = senhaAdministrador
+                )
+                escopo.launch {
+                    val resultado = apiClient.criarAdministrador(token = tokenAdmin, request = request)
+                    carregando = false
+                    resultado
+                        .onSuccess { resposta ->
+                            val adminSalvo = Administrador(
+                                id = resposta.id,
+                                nome = resposta.nome,
+                                email = resposta.email,
+                                senha = "",
+                                ativo = resposta.ativo,
+                                nivelAcesso = resposta.nivelAcesso,
+                                dataCriacao = resposta.dataCriacao ?: ""
+                            )
+                            aoSalvar(adminSalvo)
+                            mensagemSucesso = "Administrador ${resposta.nome} (${resposta.nivelAcesso}) cadastrado com sucesso!"
+                            limparCampos()
+                        }
+                        .onFailure { erro ->
+                            erroApi = erro.message ?: "Não foi possível cadastrar o administrador."
+                        }
+                }
+            }
         }
     }
 
@@ -90,16 +133,51 @@ fun TelaFormularioAdministrador(
                 .align(Alignment.TopCenter)
         ) {
             Text(
-                text = "Formulário de Cadastro de Administrador",
+                text = "Cadastro de Administrador",
                 style = MaterialTheme.typography.titleLarge,
                 color = CorMarromEscuro
             )
             Spacer(modifier = Modifier.height(16.dp))
 
+            if (!isAdminMaster) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text(
+                        text = "Acesso restrito ao Admin Master.",
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
+
+            erroApi?.let { erro ->
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text(
+                        text = erro,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
+
             mensagemSucesso?.let { sucesso ->
                 Surface(
                     color = Color(0xFFE8F5E9),
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
                     shape = MaterialTheme.shapes.small
                 ) {
                     Text(
@@ -112,87 +190,31 @@ fun TelaFormularioAdministrador(
 
             CampoTextoCustomizado(
                 value = nomeAdministrador,
-                onValueChange = { nomeAdministrador = it; erroNome = null },
+                onValueChange = { nomeAdministrador = it; erroNome = null; erroApi = null },
                 label = "Nome Completo",
                 placeholder = "Nome completo",
                 isError = erroNome != null
             )
-            erroNome?.let {
-                Text(
-                    it,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
+            erroNome?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
 
             CampoTextoCustomizado(
                 value = emailAdministrador,
-                onValueChange = { emailAdministrador = it; erroEmail = null },
+                onValueChange = { emailAdministrador = it; erroEmail = null; erroApi = null },
                 label = "E-mail",
-                placeholder = "email@exemplo.com",
+                placeholder = "admin@exemplo.com",
                 isError = erroEmail != null
             )
-            erroEmail?.let {
-                Text(
-                    it,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
+            erroEmail?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
 
             CampoTextoCustomizado(
                 value = senhaAdministrador,
-                onValueChange = { senhaAdministrador = it; erroSenha = null },
+                onValueChange = { senhaAdministrador = it; erroSenha = null; erroApi = null },
                 label = "Senha",
-                placeholder = "Digite a senha",
+                placeholder = "Maiúscula, minúscula, número e símbolo",
                 visualTransformation = PasswordVisualTransformation(),
                 isError = erroSenha != null
             )
-            erroSenha?.let {
-                Text(
-                    it,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-
-            CampoTextoCustomizado(
-                value = nivelAcessoAdministrador,
-                onValueChange = { nivelAcessoAdministrador = it; erroNivelAcesso = null },
-                label = "Nível de Acesso",
-                placeholder = "ADMIN_COMUM ou ADMIN_MASTER"
-            )
-            erroNivelAcesso?.let {
-                Text(
-                    it,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-
-            CampoTextoCustomizado(
-                value = dataCriacaoAdministrador,
-                onValueChange = { dataCriacaoAdministrador = it; erroDataCriacao = null },
-                label = "Data de Criação",
-                placeholder = "AAAA-MM-DDTHH:MM",
-                isError = erroDataCriacao != null
-            )
-            erroDataCriacao?.let {
-                Text(
-                    it,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("Ativo?")
-                Switch(checked = estaAtivo, onCheckedChange = { estaAtivo = it })
-            }
+            erroSenha?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -202,18 +224,30 @@ fun TelaFormularioAdministrador(
             ) {
                 Button(
                     onClick = gravarAdministrador,
+                    enabled = !carregando && isAdminMaster,
                     colors = ButtonDefaults.buttonColors(containerColor = CorMarromEscuro),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Gravar", color = CorBranco)
+                    if (carregando) {
+                        CircularProgressIndicator(
+                            color = CorBranco,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    } else {
+                        Text("Gravar", color = CorBranco)
+                    }
                 }
+
                 OutlinedButton(
                     onClick = { limparCampos(); mensagemSucesso = null },
+                    enabled = !carregando,
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("Limpar Campos")
                 }
             }
+
             Spacer(modifier = Modifier.height(36.dp))
         }
     }

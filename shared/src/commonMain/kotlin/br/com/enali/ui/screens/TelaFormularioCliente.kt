@@ -12,31 +12,38 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import br.com.enali.model.Cliente
+import br.com.enali.network.EnaliApiClient
+import br.com.enali.network.dto.ClienteCadastroRequest
 import br.com.enali.ui.components.CampoTextoCustomizado
 import br.com.enali.ui.theme.CorBranco
 import br.com.enali.ui.theme.CorMarromEscuro
-import kotlin.random.Random
+import kotlinx.coroutines.launch
 
 @Composable
 fun TelaFormularioCliente(
-    aoSalvar: (Cliente) -> Unit
+    apiClient: EnaliApiClient,
+    aoSalvar: (Cliente) -> Unit = {},
+    aoVoltarLogin: (() -> Unit)? = null
 ) {
+    val escopo = rememberCoroutineScope()
+
     var nomeCliente by remember { mutableStateOf("") }
     var emailCliente by remember { mutableStateOf("") }
     var senhaCliente by remember { mutableStateOf("") }
     var cpfCliente by remember { mutableStateOf("") }
     var dataNascimentoCliente by remember { mutableStateOf("") }
-    var estaAtivo by remember { mutableStateOf(true) }
 
     var erroNome by remember { mutableStateOf<String?>(null) }
     var erroEmail by remember { mutableStateOf<String?>(null) }
     var erroSenha by remember { mutableStateOf<String?>(null) }
     var erroCpf by remember { mutableStateOf<String?>(null) }
     var erroDataNascimento by remember { mutableStateOf<String?>(null) }
+    var erroApi by remember { mutableStateOf<String?>(null) }
     var mensagemSucesso by remember { mutableStateOf<String?>(null) }
+    var carregando by remember { mutableStateOf(false) }
 
-    val regexEmail = Regex("""^[\w.+-]+@[\w-]+(\.[\w-]+)+$""")
-    val regexData = Regex("""^\d{4}-\d{2}-\d{2}$""")
+    val regexEmail = remember { Regex("""^[\w.+-]+@[\w-]+(\.[\w-]+)+$""") }
+    val regexData = remember { Regex("""^\d{4}-\d{2}-\d{2}$""") }
 
     val limparCampos = {
         nomeCliente = ""
@@ -44,12 +51,12 @@ fun TelaFormularioCliente(
         senhaCliente = ""
         cpfCliente = ""
         dataNascimentoCliente = ""
-        estaAtivo = true
         erroNome = null
         erroEmail = null
         erroSenha = null
         erroCpf = null
         erroDataNascimento = null
+        erroApi = null
     }
 
     val gravarCliente = {
@@ -62,7 +69,7 @@ fun TelaFormularioCliente(
 
         erroEmail = when {
             emailCliente.isBlank() -> "O e-mail é obrigatório"
-            emailCliente.length > 150 -> "O e-mail deve ter no máximo 150 caracteres"
+            emailCliente.trim().length > 150 -> "O e-mail deve ter no máximo 150 caracteres"
             !regexEmail.matches(emailCliente.trim()) -> "Informe um e-mail válido"
             else -> null
         }
@@ -86,28 +93,47 @@ fun TelaFormularioCliente(
             else -> null
         }
 
+        erroApi = null
+        mensagemSucesso = null
+
         if (
             erroNome == null &&
             erroEmail == null &&
             erroSenha == null &&
             erroCpf == null &&
-            erroDataNascimento == null
+            erroDataNascimento == null &&
+            !carregando
         ) {
-            val novoCliente = Cliente(
-                id = Random.nextLong(1000L, 999999L),
+            carregando = true
+            val request = ClienteCadastroRequest(
                 nome = nomeCliente.trim(),
                 email = emailCliente.trim().lowercase(),
                 senha = senhaCliente,
                 cpf = cpfCliente,
-                dataNascimento = dataNascimentoCliente.trim(),
-                ativo = estaAtivo
+                dataNascimento = dataNascimentoCliente.trim()
             )
-
-            aoSalvar(novoCliente)
-            mensagemSucesso = "Cliente cadastrado com sucesso!"
-            limparCampos()
-        } else {
-            mensagemSucesso = null
+            escopo.launch {
+                val resultado = apiClient.cadastrarCliente(request)
+                carregando = false
+                resultado
+                    .onSuccess { resposta ->
+                        val clienteSalvo = Cliente(
+                            id = resposta.id,
+                            nome = resposta.nome,
+                            email = resposta.email,
+                            senha = "",
+                            cpf = resposta.cpf,
+                            dataNascimento = resposta.dataNascimento,
+                            ativo = resposta.ativo
+                        )
+                        aoSalvar(clienteSalvo)
+                        mensagemSucesso = "Cliente ${resposta.nome} cadastrado com sucesso!"
+                        limparCampos()
+                    }
+                    .onFailure { erro ->
+                        erroApi = erro.message ?: "Não foi possível cadastrar o cliente."
+                    }
+            }
         }
     }
 
@@ -127,12 +153,29 @@ fun TelaFormularioCliente(
                 .align(Alignment.TopCenter)
         ) {
             Text(
-                text = "Formulário de Cadastro de Cliente",
+                text = "Cadastro de Cliente",
                 style = MaterialTheme.typography.titleLarge,
                 color = CorMarromEscuro
             )
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            erroApi?.let { erro ->
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text(
+                        text = erro,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
 
             mensagemSucesso?.let { sucesso ->
                 Surface(
@@ -152,93 +195,49 @@ fun TelaFormularioCliente(
 
             CampoTextoCustomizado(
                 value = nomeCliente,
-                onValueChange = {
-                    nomeCliente = it
-                    erroNome = null
-                },
+                onValueChange = { nomeCliente = it; erroNome = null; erroApi = null },
                 label = "Nome do Cliente",
                 placeholder = "Maria Silva",
                 isError = erroNome != null
             )
-
-            erroNome?.let {
-                Text(it, color = MaterialTheme.colorScheme.error)
-            }
+            erroNome?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
 
             CampoTextoCustomizado(
                 value = emailCliente,
-                onValueChange = {
-                    emailCliente = it
-                    erroEmail = null
-                },
+                onValueChange = { emailCliente = it; erroEmail = null; erroApi = null },
                 label = "E-mail",
                 placeholder = "maria@email.com",
                 isError = erroEmail != null
             )
-
-            erroEmail?.let {
-                Text(it, color = MaterialTheme.colorScheme.error)
-            }
+            erroEmail?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
 
             CampoTextoCustomizado(
                 value = senhaCliente,
-                onValueChange = {
-                    senhaCliente = it
-                    erroSenha = null
-                },
+                onValueChange = { senhaCliente = it; erroSenha = null; erroApi = null },
                 label = "Senha",
                 placeholder = "Mínimo de 8 caracteres",
                 visualTransformation = PasswordVisualTransformation(),
                 isError = erroSenha != null
             )
-
-            erroSenha?.let {
-                Text(it, color = MaterialTheme.colorScheme.error)
-            }
+            erroSenha?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
 
             CampoTextoCustomizado(
                 value = cpfCliente,
-                onValueChange = {
-                    cpfCliente = it.filter(Char::isDigit).take(11)
-                    erroCpf = null
-                },
+                onValueChange = { cpfCliente = it.filter(Char::isDigit).take(11); erroCpf = null; erroApi = null },
                 label = "CPF",
-                placeholder = "Somente números",
+                placeholder = "Somente números (11 dígitos)",
                 isError = erroCpf != null
             )
-
-            erroCpf?.let {
-                Text(it, color = MaterialTheme.colorScheme.error)
-            }
+            erroCpf?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
 
             CampoTextoCustomizado(
                 value = dataNascimentoCliente,
-                onValueChange = {
-                    dataNascimentoCliente = it
-                    erroDataNascimento = null
-                },
+                onValueChange = { dataNascimentoCliente = it; erroDataNascimento = null; erroApi = null },
                 label = "Data de Nascimento",
                 placeholder = "AAAA-MM-DD",
                 isError = erroDataNascimento != null
             )
-
-            erroDataNascimento?.let {
-                Text(it, color = MaterialTheme.colorScheme.error)
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("Cliente Ativo?")
-                Switch(
-                    checked = estaAtivo,
-                    onCheckedChange = { estaAtivo = it }
-                )
-            }
+            erroDataNascimento?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -248,22 +247,38 @@ fun TelaFormularioCliente(
             ) {
                 Button(
                     onClick = gravarCliente,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = CorMarromEscuro
-                    ),
+                    enabled = !carregando,
+                    colors = ButtonDefaults.buttonColors(containerColor = CorMarromEscuro),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Gravar", color = CorBranco)
+                    if (carregando) {
+                        CircularProgressIndicator(
+                            color = CorBranco,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    } else {
+                        Text("Cadastrar", color = CorBranco)
+                    }
                 }
 
                 OutlinedButton(
-                    onClick = {
-                        limparCampos()
-                        mensagemSucesso = null
-                    },
+                    onClick = { limparCampos(); mensagemSucesso = null },
+                    enabled = !carregando,
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("Limpar Campos")
+                }
+            }
+
+            if (aoVoltarLogin != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                TextButton(
+                    onClick = aoVoltarLogin,
+                    enabled = !carregando,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                ) {
+                    Text("Já tem conta? Entrar", color = CorMarromEscuro)
                 }
             }
 
