@@ -17,7 +17,6 @@ import br.com.enali.model.Produto
 import br.com.enali.network.EnaliApiClient
 import br.com.enali.ui.theme.CorBegeMedio
 import br.com.enali.ui.theme.CorBranco
-import br.com.enali.ui.theme.CorFundoClaro
 import br.com.enali.ui.theme.CorMarromEscuro
 import kotlinx.coroutines.launch
 
@@ -49,7 +48,8 @@ fun TelaListagemProdutosAdmin(
                                 descricao = it.descricao,
                                 preco = it.preco,
                                 disponivel = it.disponivel,
-                                desconto = it.desconto
+                                desconto = it.desconto,
+                                imagensUrls = it.imagensUrls
                             )
                         }
                     )
@@ -79,8 +79,12 @@ fun TelaListagemProdutosAdmin(
                 }
                 aoAtualizarLista(novaLista)
                 produtoEmFormulario = null
+                carregarProdutos()
             },
-            aoCancelar = { produtoEmFormulario = null }
+            aoCancelar = {
+                produtoEmFormulario = null
+                carregarProdutos()
+            }
         )
         return
     }
@@ -112,7 +116,7 @@ fun TelaListagemProdutosAdmin(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Gerencie o catálogo, pesquise itens e atualize dados.",
+                    text = "Gerencie o catálogo, pesquise itens, imagens e atualize dados.",
                     color = Color(0xFF71665C),
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -199,12 +203,12 @@ fun TelaListagemProdutosAdmin(
                                     color = CorMarromEscuro
                                 )
                                 Text(
-                                    text = "${formatarPrecoProduto(produto.preco)}  |  Desconto: ${produto.desconto}%",
+                                    text = "${formatarPrecoProduto(produto.preco)}  |  Desconto: ${produto.desconto}%  |  Imagens: ${produto.imagensUrls.size}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = Color(0xFF71665C)
                                 )
                                 Surface(
-                                    color = if (produto.disponivel) Color(0xFFE8F1E3) else CorFundoClaro,
+                                    color = if (produto.disponivel) Color(0xFFE8F1E3) else Color(0xFFF5F3EF),
                                     shape = RoundedCornerShape(20.dp)
                                 ) {
                                     Text(

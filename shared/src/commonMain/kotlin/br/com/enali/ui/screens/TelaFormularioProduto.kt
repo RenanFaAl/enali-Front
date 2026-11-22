@@ -15,14 +15,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import br.com.enali.model.Produto
 import br.com.enali.network.EnaliApiClient
+import br.com.enali.network.dto.ImagemUploadItem
+import br.com.enali.network.dto.ProdutoImagemResponse
 import br.com.enali.network.dto.ProdutoRequest
 import br.com.enali.ui.components.CampoTextoCustomizado
+import br.com.enali.ui.components.selecionarImagensProduto
 import br.com.enali.ui.theme.CorBegeMedio
 import br.com.enali.ui.theme.CorBranco
-import br.com.enali.ui.theme.CorFundoClaro
 import br.com.enali.ui.theme.CorMarromEscuro
 import kotlinx.coroutines.launch
 import kotlin.math.roundToLong
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import br.com.enali.ui.components.toComposeImageBitmap
 
 internal fun formatarPrecoProduto(valor: Double): String {
     if (!valor.isFinite()) return "R$ 0,00"
@@ -30,6 +36,11 @@ internal fun formatarPrecoProduto(valor: Double): String {
     val reais = centavos / 100
     val resto = (centavos % 100).toString().padStart(2, '0')
     return "R$ $reais,$resto"
+}
+
+private fun formatarTamanhoKb(bytes: Int): String {
+    val kb = (bytes / 1024.0 * 10).roundToLong() / 10.0
+    return "$kb KB"
 }
 
 @Composable
@@ -53,13 +64,74 @@ fun TelaFormularioProduto(
     }
     var estaDisponivel by remember(produtoEmEdicao) { mutableStateOf(produtoEmEdicao?.disponivel ?: true) }
 
+    val imagensNovoProduto = remember(produtoEmEdicao) { mutableStateListOf<ImagemUploadItem>() }
+
+    val imagensExistentes = remember(produtoEmEdicao) { mutableStateListOf<ProdutoImagemResponse>() }
+    var carregandoImagens by remember { mutableStateOf(false) }
+
+    val novasImagensEdicao = remember(produtoEmEdicao) { mutableStateListOf<ImagemUploadItem>() }
+    var ordemNovaImagemTexto by remember { mutableStateOf("") }
+    var enviandoImagem by remember { mutableStateOf(false) }
+    var removendoImagemId by remember { mutableStateOf<Long?>(null) }
+
     var erroNome by remember { mutableStateOf<String?>(null) }
     var erroDescricao by remember { mutableStateOf<String?>(null) }
     var erroPreco by remember { mutableStateOf<String?>(null) }
     var erroDesconto by remember { mutableStateOf<String?>(null) }
+    var erroImagem by remember { mutableStateOf<String?>(null) }
     var erroApi by remember { mutableStateOf<String?>(null) }
     var mensagemSucesso by remember { mutableStateOf<String?>(null) }
     var carregando by remember { mutableStateOf(false) }
+    
+    val bitmapsExistentes = remember(produtoEmEdicao) { mutableStateMapOf<Long, ImageBitmap>() }
+
+    LaunchedEffect(produtoEmEdicao?.id) {
+        if (produtoEmEdicao != null && produtoEmEdicao.id > 0L) {
+            carregandoImagens = true
+            erroImagem = null
+            bitmapsExistentes.clear()
+            apiClient.listarImagensProduto(produtoEmEdicao.id)
+                .onSuccess { lista ->
+                    val ordenadas = lista.sortedWith(compareBy({ it.ordem }, { it.id }))
+                    imagensExistentes.clear()
+                    imagensExistentes.addAll(ordenadas)
+
+                    ordenadas.forEach { img ->
+                        apiClient.buscarImagemProdutoBytes(produtoEmEdicao.id, img.id)
+                            .onSuccess { bytes ->
+                                bytes.toComposeImageBitmap()?.let { bitmap ->
+                                    bitmapsExistentes[img.id] = bitmap
+                                }
+                            }
+                    }
+                }
+                .onFailure { erro ->
+                    erroImagem = erro.message ?: "Não foi possível carregar as imagens do produto."
+                }
+            carregandoImagens = false
+        } else {
+            imagensExistentes.clear()
+            bitmapsExistentes.clear()
+        }
+    }
+
+    LaunchedEffect(produtoEmEdicao?.id) {
+        if (produtoEmEdicao != null && produtoEmEdicao.id > 0L) {
+            carregandoImagens = true
+            erroImagem = null
+            apiClient.listarImagensProduto(produtoEmEdicao.id)
+                .onSuccess { lista ->
+                    imagensExistentes.clear()
+                    imagensExistentes.addAll(lista.sortedWith(compareBy({ it.ordem }, { it.id })))
+                }
+                .onFailure { erro ->
+                    erroImagem = erro.message ?: "Não foi possível carregar as imagens do produto."
+                }
+            carregandoImagens = false
+        } else {
+            imagensExistentes.clear()
+        }
+    }
 
     val precoDigitado = precoProduto.replace(",", ".").toDoubleOrNull()
     val descontoDigitado = descontoProduto.replace(",", ".").toDoubleOrNull()
@@ -79,10 +151,12 @@ fun TelaFormularioProduto(
         precoProduto = ""
         descontoProduto = "0"
         estaDisponivel = true
+        imagensNovoProduto.clear()
         erroNome = null
         erroDescricao = null
         erroPreco = null
         erroDesconto = null
+        erroImagem = null
         erroApi = null
     }
 
@@ -134,7 +208,7 @@ fun TelaFormularioProduto(
                 val resultado = if (produtoEmEdicao != null) {
                     apiClient.atualizarProduto(tokenAdmin, produtoEmEdicao.id, request)
                 } else {
-                    apiClient.cadastrarProduto(tokenAdmin, request)
+                    apiClient.cadastrarProduto(tokenAdmin, request, imagensNovoProduto.toList())
                 }
                 carregando = false
                 resultado
@@ -146,7 +220,8 @@ fun TelaFormularioProduto(
                                 descricao = resp.descricao,
                                 preco = resp.preco,
                                 disponivel = resp.disponivel,
-                                desconto = resp.desconto
+                                desconto = resp.desconto,
+                                imagensUrls = resp.imagensUrls
                             )
                         )
                         mensagemSucesso = if (estaEditando) {
@@ -160,6 +235,65 @@ fun TelaFormularioProduto(
                         erroApi = erro.message ?: "Não foi possível salvar o produto."
                     }
             }
+        }
+    }
+
+    fun enviarNovasImagensNaEdicao(produtoId: Long) {
+        if (novasImagensEdicao.isEmpty() || enviandoImagem) return
+
+        val ordemBase = ordemNovaImagemTexto.trim().toIntOrNull()
+        if (ordemNovaImagemTexto.isNotBlank() && (ordemBase == null || ordemBase < 0)) {
+            erroImagem = "A ordem informada deve ser um número inteiro maior ou igual a zero."
+            return
+        }
+
+        erroImagem = null
+        mensagemSucesso = null
+        enviandoImagem = true
+
+        escopo.launch {
+            val fila = novasImagensEdicao.toList()
+            fila.forEachIndexed { idx, img ->
+                val ordemDefinida = ordemBase?.plus(idx)
+                apiClient.adicionarImagemProduto(
+                    token = tokenAdmin,
+                    produtoId = produtoId,
+                    imagem = img,
+                    ordem = ordemDefinida
+                ).onSuccess { criada ->
+                    imagensExistentes.add(criada)
+                    novasImagensEdicao.remove(img)
+                }.onFailure { erro ->
+                    erroImagem = erro.message ?: "Falha ao enviar a imagem \"${img.nomeArquivo}\"."
+                }
+            }
+            imagensExistentes.sortWith(compareBy({ it.ordem }, { it.id }))
+            enviandoImagem = false
+            if (erroImagem == null) {
+                ordemNovaImagemTexto = ""
+                mensagemSucesso = "Imagem(ns) adicionada(s) ao produto!"
+            }
+        }
+    }
+
+    fun excluirImagemExistente(produtoId: Long, imagem: ProdutoImagemResponse) {
+        if (removendoImagemId != null) return
+        erroImagem = null
+        mensagemSucesso = null
+        removendoImagemId = imagem.id
+
+        escopo.launch {
+            apiClient.removerImagemProduto(
+                token = tokenAdmin,
+                produtoId = produtoId,
+                imagemId = imagem.id
+            ).onSuccess {
+                imagensExistentes.removeAll { it.id == imagem.id }
+                mensagemSucesso = "Imagem #${imagem.id} removida."
+            }.onFailure { erro ->
+                erroImagem = erro.message ?: "Não foi possível remover a imagem."
+            }
+            removendoImagemId = null
         }
     }
 
@@ -183,7 +317,7 @@ fun TelaFormularioProduto(
                 fontWeight = FontWeight.Bold
             )
             if (aoCancelar != null) {
-                OutlinedButton(onClick = aoCancelar, enabled = !carregando) {
+                OutlinedButton(onClick = aoCancelar, enabled = !carregando && !enviandoImagem) {
                     Text("Voltar para lista", color = CorMarromEscuro)
                 }
             }
@@ -293,10 +427,292 @@ fun TelaFormularioProduto(
                     )
                 }
 
+                HorizontalDivider(color = CorBegeMedio.copy(alpha = 0.55f))
+
+                // --- SEÇÃO DE IMAGENS ---
+                if (!estaEditando) {
+                    Text(
+                        text = "Imagens do produto (opcional — JPEG, PNG ou WebP até 5 MB)",
+                        fontWeight = FontWeight.SemiBold,
+                        color = CorMarromEscuro
+                    )
+
+                    OutlinedButton(
+                        onClick = {
+                            erroImagem = null
+                            selecionarImagensProduto(
+                                permiteMultiplas = true,
+                                onSelecionadas = { selecionadas ->
+                                    imagensNovoProduto.addAll(selecionadas)
+                                },
+                                onErro = { msg -> erroImagem = msg }
+                            )
+                        },
+                        enabled = !carregando
+                    ) {
+                        Text("Selecionar imagens", color = CorMarromEscuro)
+                    }
+
+                    erroImagem?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+
+                    imagensNovoProduto.forEachIndexed { indice, img ->
+                        Surface(
+                            color = Color(0xFFFAF8F5),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, CorBegeMedio.copy(alpha = 0.45f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "${indice + 1}. ${img.nomeArquivo}",
+                                        fontWeight = FontWeight.Medium,
+                                        color = CorMarromEscuro
+                                    )
+                                    Text(
+                                        text = "${img.tipoMime} • ${formatarTamanhoKb(img.bytes.size)}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFF71665C)
+                                    )
+                                }
+
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    TextButton(
+                                        onClick = {
+                                            if (indice > 0) {
+                                                val temp = imagensNovoProduto[indice - 1]
+                                                imagensNovoProduto[indice - 1] = imagensNovoProduto[indice]
+                                                imagensNovoProduto[indice] = temp
+                                            }
+                                        },
+                                        enabled = indice > 0 && !carregando
+                                    ) {
+                                        Text("↑", color = CorMarromEscuro)
+                                    }
+                                    TextButton(
+                                        onClick = {
+                                            if (indice < imagensNovoProduto.lastIndex) {
+                                                val temp = imagensNovoProduto[indice + 1]
+                                                imagensNovoProduto[indice + 1] = imagensNovoProduto[indice]
+                                                imagensNovoProduto[indice] = temp
+                                            }
+                                        },
+                                        enabled = indice < imagensNovoProduto.lastIndex && !carregando
+                                    ) {
+                                        Text("↓", color = CorMarromEscuro)
+                                    }
+                                    TextButton(
+                                        onClick = { imagensNovoProduto.removeAt(indice) },
+                                        enabled = !carregando
+                                    ) {
+                                        Text("Remover", color = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else if (produtoEmEdicao != null) {
+                    Text(
+                        text = "Imagens cadastradas (${imagensExistentes.size})",
+                        fontWeight = FontWeight.SemiBold,
+                        color = CorMarromEscuro
+                    )
+
+                    Text(
+                        text = "Dica: ao adicionar novas imagens, você pode informar a ordem inicial (opcional). A reordenação de imagens já salvas no banco requer endpoint específico no backend.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF71665C)
+                    )
+
+                    if (carregandoImagens) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = CorMarromEscuro)
+                    }
+
+                    imagensExistentes.forEachIndexed { indice, img ->
+                        val bitmap = bitmapsExistentes[img.id]
+
+                        Surface(
+                            color = Color(0xFFFAF8F5),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, CorBegeMedio.copy(alpha = 0.45f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, CorBegeMedio.copy(alpha = 0.45f)),
+                                    color = CorBranco,
+                                    modifier = Modifier.size(64.dp)
+                                ) {
+                                    if (bitmap != null) {
+                                        Image(
+                                            bitmap = bitmap,
+                                            contentDescription = "Imagem #${img.id} do produto",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    } else {
+                                        Box(
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = if (carregandoImagens) "..." else "#${img.id}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color(0xFF71665C)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Imagem #${img.id} (Ordem na lista: $indice • API ordem: ${img.ordem})",
+                                        fontWeight = FontWeight.Medium,
+                                        color = CorMarromEscuro
+                                    )
+                                    Text(
+                                        text = "${img.tipoMime} • ${formatarTamanhoKb(img.tamanhoBytes)} • ${img.url}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFF71665C)
+                                    )
+                                }
+
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    TextButton(
+                                        onClick = {
+                                            if (indice > 0) {
+                                                val temp = imagensExistentes[indice - 1]
+                                                imagensExistentes[indice - 1] = imagensExistentes[indice]
+                                                imagensExistentes[indice] = temp
+                                            }
+                                        },
+                                        enabled = indice > 0 && !enviandoImagem && removendoImagemId == null
+                                    ) {
+                                        Text("↑", color = CorMarromEscuro)
+                                    }
+                                    TextButton(
+                                        onClick = {
+                                            if (indice < imagensExistentes.lastIndex) {
+                                                val temp = imagensExistentes[indice + 1]
+                                                imagensExistentes[indice + 1] = imagensExistentes[indice]
+                                                imagensExistentes[indice] = temp
+                                            }
+                                        },
+                                        enabled = indice < imagensExistentes.lastIndex && !enviandoImagem && removendoImagemId == null
+                                    ) {
+                                        Text("↓", color = CorMarromEscuro)
+                                    }
+                                    TextButton(
+                                        onClick = {
+                                            excluirImagemExistente(produtoEmEdicao.id, img)
+                                            bitmapsExistentes.remove(img.id)
+                                        },
+                                        enabled = !enviandoImagem && removendoImagemId == null
+                                    ) {
+                                        Text(
+                                            if (removendoImagemId == img.id) "Excluindo..." else "Excluir",
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Adicionar novas imagens ao produto",
+                        fontWeight = FontWeight.Medium,
+                        color = CorMarromEscuro
+                    )
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                erroImagem = null
+                                selecionarImagensProduto(
+                                    permiteMultiplas = true,
+                                    onSelecionadas = { selecionadas ->
+                                        novasImagensEdicao.addAll(selecionadas)
+                                    },
+                                    onErro = { msg -> erroImagem = msg }
+                                )
+                            },
+                            enabled = !enviandoImagem && !carregando
+                        ) {
+                            Text("Escolher arquivos", color = CorMarromEscuro)
+                        }
+
+                        OutlinedTextField(
+                            value = ordemNovaImagemTexto,
+                            onValueChange = { ordemNovaImagemTexto = it; erroImagem = null },
+                            label = { Text("Ordem (opcional)") },
+                            placeholder = { Text("Ex.: 0") },
+                            singleLine = true,
+                            modifier = Modifier.width(150.dp)
+                        )
+
+                        Button(
+                            onClick = { enviarNovasImagensNaEdicao(produtoEmEdicao.id) },
+                            enabled = novasImagensEdicao.isNotEmpty() && !enviandoImagem && !carregando,
+                            colors = ButtonDefaults.buttonColors(containerColor = CorMarromEscuro)
+                        ) {
+                            Text(
+                                if (enviandoImagem) "Enviando..." else "Enviar imagens",
+                                color = CorBranco
+                            )
+                        }
+                    }
+
+                    erroImagem?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+
+                    novasImagensEdicao.forEachIndexed { idx, img ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Pendente: ${img.nomeArquivo} (${formatarTamanhoKb(img.bytes.size)})",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = CorMarromEscuro,
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(
+                                onClick = { novasImagensEdicao.removeAt(idx) },
+                                enabled = !enviandoImagem
+                            ) {
+                                Text("Remover", color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(4.dp))
+
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                     Button(
                         onClick = gravarProduto,
-                        enabled = !carregando,
+                        enabled = !carregando && !enviandoImagem,
                         modifier = Modifier.weight(1f).height(48.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = CorMarromEscuro),
                         shape = RoundedCornerShape(10.dp)
