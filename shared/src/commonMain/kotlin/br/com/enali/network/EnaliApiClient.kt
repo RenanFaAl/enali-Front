@@ -12,6 +12,14 @@ import br.com.enali.network.dto.ClientePerfilResponse
 import br.com.enali.network.services.AdminApiService
 import br.com.enali.network.services.AuthApiService
 import br.com.enali.network.services.ClienteApiService
+import br.com.enali.network.dto.ImagemUploadItem
+import br.com.enali.network.dto.ProdutoImagemResponse
+import br.com.enali.network.dto.ProdutoRequest
+import br.com.enali.network.dto.ProdutoResponse
+import br.com.enali.network.services.ProdutoApiService
+import br.com.enali.network.dto.EstoqueRequest
+import br.com.enali.network.dto.EstoqueResponse
+import br.com.enali.network.services.EstoqueApiService
 import io.ktor.client.HttpClient
 
 class EnaliApiClient(
@@ -29,6 +37,16 @@ class EnaliApiClient(
     )
 
     val cliente: ClienteApiService = ClienteApiService(
+        httpClient = httpClient,
+        baseUrl = baseUrl
+    )
+    
+    val produto: ProdutoApiService = ProdutoApiService(
+        httpClient = httpClient,
+        baseUrl = baseUrl
+    )
+    
+    val estoque: EstoqueApiService = EstoqueApiService(
         httpClient = httpClient,
         baseUrl = baseUrl
     )
@@ -76,4 +94,67 @@ class EnaliApiClient(
     fun fechar() {
         httpClient.close()
     }
+    
+    suspend fun listarProdutos(): Result<List<ProdutoResponse>> = produto.listarProdutos()
+
+    suspend fun buscarProdutoPorId(id: Long): Result<ProdutoResponse> =
+        produto.buscarProdutoPorId(id)
+
+    suspend fun buscarProdutosPorNome(nome: String): Result<List<ProdutoResponse>> =
+        produto.buscarProdutosPorNome(nome)
+
+    suspend fun cadastrarProduto(
+        token: String,
+        request: ProdutoRequest,
+        imagens: List<ImagemUploadItem> = emptyList()
+    ): Result<ProdutoResponse> = produto.cadastrarProduto(token, request, imagens)
+
+    suspend fun atualizarProduto(
+        token: String,
+        id: Long,
+        request: ProdutoRequest
+    ): Result<ProdutoResponse> = produto.atualizarProduto(token, id, request)
+
+    suspend fun excluirProduto(token: String, id: Long): Result<Unit> =
+        produto.excluirProduto(token, id)
+
+    suspend fun listarImagensProduto(produtoId: Long): Result<List<ProdutoImagemResponse>> =
+        produto.listarImagens(produtoId)
+
+    suspend fun adicionarImagemProduto(
+        token: String,
+        produtoId: Long,
+        imagem: ImagemUploadItem,
+        ordem: Int? = null
+    ): Result<ProdutoImagemResponse> = produto.adicionarImagem(token, produtoId, imagem, ordem)
+
+    suspend fun buscarImagemProdutoBytes(
+        produtoId: Long,
+        imagemId: Long
+    ): Result<ByteArray> = produto.buscarImagemBytes(produtoId, imagemId)
+    
+    suspend fun removerImagemProduto(
+        token: String,
+        produtoId: Long,
+        imagemId: Long
+    ): Result<Unit> = produto.removerImagem(token, produtoId, imagemId)
+
+    suspend fun listarEstoques(token: String): Result<List<EstoqueResponse>> =
+        estoque.listarEstoques(token)
+
+    suspend fun buscarEstoquePorProdutoId(produtoId: Long): Result<EstoqueResponse> =
+        estoque.buscarEstoquePorProdutoId(produtoId)
+
+    suspend fun cadastrarEstoque(token: String, request: EstoqueRequest): Result<EstoqueResponse> =
+        estoque.cadastrarEstoque(token, request)
+
+    suspend fun atualizarEstoque(
+        token: String,
+        id: Long,
+        request: EstoqueRequest
+    ): Result<EstoqueResponse> = estoque.atualizarEstoque(token, id, request)
+
+    suspend fun excluirEstoque(token: String, id: Long): Result<Unit> =
+        estoque.excluirEstoque(token, id)
+        
 }
