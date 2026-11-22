@@ -4,14 +4,17 @@ package br.com.enali.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -19,112 +22,170 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.material.icons.filled.ShoppingCart
 import br.com.enali.ui.theme.CorBegeMedio
-import br.com.enali.ui.theme.CorFundoClaro
+import br.com.enali.ui.theme.CorBranco
 import br.com.enali.ui.theme.CorMarromEscuro
-
 
 @Composable
 fun ItemMenuLateral(
     titulo: String,
     icone: ImageVector,
     estaSelecionado: Boolean,
-    aoClicar: () -> Unit
+    aoClicar: () -> Unit,
+    compacto: Boolean = false
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(if (estaSelecionado) CorFundoClaro else CorBegeMedio)
-            .clickable { aoClicar() }
-            .padding(vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(
-            imageVector = icone,
-            contentDescription = titulo,
-            tint = CorMarromEscuro,
-            modifier = Modifier.size(24.dp)
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = titulo,
-            color = CorMarromEscuro,
-            fontWeight = if (estaSelecionado) FontWeight.Bold else FontWeight.Normal,
-            style = MaterialTheme.typography.bodySmall
-        )
+    val corItem = if (estaSelecionado) CorBegeMedio else CorBranco
+    val corTexto = if (estaSelecionado) CorMarromEscuro else CorBranco
+
+    if (compacto) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 3.dp)
+                .background(
+                    if (estaSelecionado) CorBegeMedio else CorMarromEscuro,
+                    RoundedCornerShape(10.dp)
+                )
+                .clickable { aoClicar() }
+                .padding(vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                icone,
+                contentDescription = titulo,
+                tint = corTexto,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                titulo,
+                color = corTexto,
+                style = MaterialTheme.typography.labelSmall
+            )
+        }
+    } else {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 3.dp)
+                .background(
+                    if (estaSelecionado) CorBegeMedio else CorMarromEscuro,
+                    RoundedCornerShape(10.dp)
+                )
+                .clickable { aoClicar() }
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                icone,
+                contentDescription = titulo,
+                tint = corItem,
+                modifier = Modifier.size(21.dp)
+            )
+            Text(
+                titulo,
+                color = corTexto,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (estaSelecionado) {
+                    FontWeight.SemiBold
+                } else {
+                    FontWeight.Normal
+                }
+            )
+        }
     }
 }
 
 @Composable
 fun BarraLateral(
     telaAtual: String,
-    aoMudarTela: (String) -> Unit
+    aoMudarTela: (String) -> Unit,
+    compacto: Boolean = false
 ) {
     Column(
         modifier = Modifier
-            .width(90.dp)
+            .width(if (compacto) 86.dp else 194.dp)
             .fillMaxHeight()
-            .background(CorBegeMedio),
+            .background(CorMarromEscuro)
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = if (compacto) "E" else "Enali",
+            style = if (compacto) {
+                MaterialTheme.typography.headlineMedium
+            } else {
+                MaterialTheme.typography.headlineSmall
+            },
+            fontWeight = FontWeight.Bold,
+            color = CorBranco,
+            modifier = Modifier.padding(top = 24.dp, bottom = 22.dp)
+        )
+
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = 14.dp),
+            color = CorBegeMedio.copy(alpha = 0.55f)
+        )
+        Spacer(Modifier.height(12.dp))
 
         ItemMenuLateral(
-            titulo = "Admin",
-            icone = Icons.Default.Person,
-            estaSelecionado = (telaAtual == "ADMINISTRADOR"),
-            aoClicar = { aoMudarTela("ADMINISTRADOR") }
+            "Admin",
+            Icons.Default.Person,
+            telaAtual == "ADMINISTRADOR",
+            { aoMudarTela("ADMINISTRADOR") },
+            compacto
         )
-
         ItemMenuLateral(
-            titulo = "Endereço",
-            icone = Icons.Default.LocationOn,
-            estaSelecionado = (telaAtual == "ENDERECO"),
-            aoClicar = { aoMudarTela("ENDERECO") }
+            "Endereço",
+            Icons.Default.LocationOn,
+            telaAtual == "ENDERECO",
+            { aoMudarTela("ENDERECO") },
+            compacto
         )
-
         ItemMenuLateral(
-            titulo = "Produto",
-            icone = Icons.Default.ShoppingCart,
-            estaSelecionado = (telaAtual == "PRODUTO"),
-            aoClicar = { aoMudarTela("PRODUTO") }
+            "Produto",
+            Icons.Default.ShoppingCart,
+            telaAtual == "PRODUTO",
+            { aoMudarTela("PRODUTO") },
+            compacto
         )
-
         ItemMenuLateral(
-            titulo = "Estoque",
-            icone = Icons.Default.List,
-            estaSelecionado = (telaAtual == "ESTOQUE"),
-            aoClicar = { aoMudarTela("ESTOQUE") }
+            "Estoque",
+            Icons.Default.List,
+            telaAtual == "ESTOQUE",
+            { aoMudarTela("ESTOQUE") },
+            compacto
         )
-            
-       ItemMenuLateral(
-            titulo = "Cliente",
-            icone = Icons.Default.Person,
-            estaSelecionado = telaAtual == "CLIENTE",
-            aoClicar = { aoMudarTela("CLIENTE") }
-        )
-
         ItemMenuLateral(
-            titulo = "Pedido",
-            icone = Icons.Default.Receipt,
-            estaSelecionado = telaAtual == "PEDIDO",
-            aoClicar = { aoMudarTela("PEDIDO") }
+            "Cliente",
+            Icons.Default.Person,
+            telaAtual == "CLIENTE",
+            { aoMudarTela("CLIENTE") },
+            compacto
         )
-
         ItemMenuLateral(
-            titulo = "Material",
-            icone = Icons.Default.Build,
-            estaSelecionado = telaAtual == "MATERIAL",
-            aoClicar = { aoMudarTela("MATERIAL") }
+            "Pedido",
+            Icons.Default.Receipt,
+            telaAtual == "PEDIDO",
+            { aoMudarTela("PEDIDO") },
+            compacto
         )
-
         ItemMenuLateral(
-            titulo = "Fornecedor",
-            icone = Icons.Default.LocalShipping,
-            estaSelecionado = telaAtual == "FORNECEDOR",
-            aoClicar = { aoMudarTela("FORNECEDOR") }
+            "Material",
+            Icons.Default.Build,
+            telaAtual == "MATERIAL",
+            { aoMudarTela("MATERIAL") },
+            compacto
+        )
+        ItemMenuLateral(
+            "Fornecedor",
+            Icons.Default.LocalShipping,
+            telaAtual == "FORNECEDOR",
+            { aoMudarTela("FORNECEDOR") },
+            compacto
         )
 
+        Spacer(Modifier.height(18.dp))
     }
 }

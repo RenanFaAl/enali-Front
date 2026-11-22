@@ -8,42 +8,56 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import br.com.enali.model.Administrador
-import br.com.enali.model.Endereco
-import br.com.enali.model.Produto
-import br.com.enali.model.Estoque
-import br.com.enali.ui.components.BarraLateral
-import br.com.enali.ui.screens.TelaFormularioAdministrador
-import br.com.enali.ui.screens.TelaFormularioEndereco
-import br.com.enali.ui.screens.TelaFormularioProduto
-import br.com.enali.ui.screens.TelaFormularioEstoque
 import br.com.enali.model.Cliente
-import br.com.enali.model.Pedido
-import br.com.enali.model.Material
+import br.com.enali.model.Endereco
+import br.com.enali.model.Estoque
 import br.com.enali.model.Fornecedor
-import br.com.enali.ui.screens.TelaFormularioMaterial
-import br.com.enali.ui.screens.TelaFormularioFornecedor
+import br.com.enali.model.Material
+import br.com.enali.model.Pedido
+import br.com.enali.model.Produto
 import br.com.enali.ui.components.BarraLateral
 import br.com.enali.ui.screens.TelaFormularioAdministrador
-import br.com.enali.ui.screens.TelaFormularioEndereco
 import br.com.enali.ui.screens.TelaFormularioCliente
+import br.com.enali.ui.screens.TelaFormularioEndereco
+import br.com.enali.ui.screens.TelaFormularioEstoque
+import br.com.enali.ui.screens.TelaFormularioFornecedor
+import br.com.enali.ui.screens.TelaFormularioMaterial
 import br.com.enali.ui.screens.TelaFormularioPedido
+import br.com.enali.ui.screens.TelaFormularioProduto
 import br.com.enali.ui.theme.CorBegeMedio
 import br.com.enali.ui.theme.CorFundoClaro
 import br.com.enali.ui.theme.CorMarromEscuro
 
 @Composable
 fun App() {
+    var identificadorTelaAtual by remember {
+        mutableStateOf("ADMINISTRADOR")
+    }
 
-    var identificadorTelaAtual by remember { mutableStateOf("ADMINISTRADOR") }
-
-    val listaDeAdministradores = remember { mutableStateOf(listOf<Administrador>()) }
-    val listaDeEnderecos = remember { mutableStateOf(listOf<Endereco>()) }
-    val listaDeProdutos = remember { mutableStateOf(listOf<Produto>()) }
-    val listaDeEstoques = remember { mutableStateOf(listOf<Estoque>()) }
-    val listaDeClientes = remember { mutableStateOf(listOf<Cliente>()) }
-    val listaDePedidos = remember { mutableStateOf(listOf<Pedido>()) }
-    val listaDeMateriais = remember { mutableStateOf(listOf<Material>()) }
-    val listaDeFornecedores = remember { mutableStateOf(listOf<Fornecedor>()) }
+    val listaDeAdministradores = remember {
+        mutableStateOf(listOf<Administrador>())
+    }
+    val listaDeEnderecos = remember {
+        mutableStateOf(listOf<Endereco>())
+    }
+    val listaDeProdutos = remember {
+        mutableStateOf(listOf<Produto>())
+    }
+    val listaDeEstoques = remember {
+        mutableStateOf(listOf<Estoque>())
+    }
+    val listaDeClientes = remember {
+        mutableStateOf(listOf<Cliente>())
+    }
+    val listaDePedidos = remember {
+        mutableStateOf(listOf<Pedido>())
+    }
+    val listaDeMateriais = remember {
+        mutableStateOf(listOf<Material>())
+    }
+    val listaDeFornecedores = remember {
+        mutableStateOf(listOf<Fornecedor>())
+    }
 
     MaterialTheme(
         colorScheme = lightColorScheme(
@@ -61,81 +75,101 @@ fun App() {
                 ) {
                     Text(
                         text = "Sistema Enali",
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(
+                            horizontal = 16.dp,
+                            vertical = 8.dp
+                        ),
                         color = CorMarromEscuro,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
             }
-        ) {
-            Row(
+        ) { espacamento ->
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(CorFundoClaro)
+                    .padding(espacamento)
             ) {
-                BarraLateral(
-                    telaAtual = identificadorTelaAtual,
-                    aoMudarTela = { novaTela -> identificadorTelaAtual = novaTela }
-                )
+                val compacto = maxWidth < 760.dp
 
-                Box(
+                Row(
                     modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
+                        .fillMaxSize()
+                        .background(CorFundoClaro)
                 ) {
-                    when (identificadorTelaAtual) {
-                        "ADMINISTRADOR" -> TelaFormularioAdministrador(
-                            aoSalvar = { novoAdmin ->
-                                listaDeAdministradores.value = listaDeAdministradores.value + novoAdmin
-                            }
-                        )
+                    BarraLateral(
+                        telaAtual = identificadorTelaAtual,
+                        aoMudarTela = { novaTela ->
+                            identificadorTelaAtual = novaTela
+                        },
+                        compacto = compacto
+                    )
 
-                        "ENDERECO" -> TelaFormularioEndereco(
-                            aoSalvar = { novoEndereco ->
-                                listaDeEnderecos.value = listaDeEnderecos.value + novoEndereco
-                            }
-                        )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    ) {
+                        when (identificadorTelaAtual) {
+                            "ADMINISTRADOR" -> TelaFormularioAdministrador(
+                                aoSalvar = { novoAdmin ->
+                                    listaDeAdministradores.value =
+                                        listaDeAdministradores.value + novoAdmin
+                                }
+                            )
 
-                        "PRODUTO" -> TelaFormularioProduto(
-                            aoSalvar = { novoProduto ->
-                                listaDeProdutos.value = listaDeProdutos.value + novoProduto
-                            }
-                        )
+                            "ENDERECO" -> TelaFormularioEndereco(
+                                aoSalvar = { novoEndereco ->
+                                    listaDeEnderecos.value =
+                                        listaDeEnderecos.value + novoEndereco
+                                }
+                            )
 
-                        "ESTOQUE" -> TelaFormularioEstoque(
-                            listaProdutos = listaDeProdutos.value,
-                            aoSalvar = { novoEstoque ->
-                                listaDeEstoques.value = listaDeEstoques.value + novoEstoque
-                            }
-                        )
-                        
-                        "CLIENTE" -> TelaFormularioCliente(
-                            aoSalvar = { novoCliente ->
-                                listaDeClientes.value =
-                                    listaDeClientes.value + novoCliente
-                            }
-                        )
+                            "PRODUTO" -> TelaFormularioProduto(
+                                aoSalvar = { novoProduto ->
+                                    listaDeProdutos.value =
+                                        listaDeProdutos.value + novoProduto
+                                },
+                                listaProdutos = listaDeProdutos.value
+                            )
 
-                        "PEDIDO" -> TelaFormularioPedido(
-                            aoSalvar = { novoPedido ->
-                                listaDePedidos.value =
-                                    listaDePedidos.value + novoPedido
-                            }
-                        )
+                            "ESTOQUE" -> TelaFormularioEstoque(
+                                listaProdutos = listaDeProdutos.value,
+                                aoSalvar = { novoEstoque ->
+                                    listaDeEstoques.value =
+                                        listaDeEstoques.value + novoEstoque
+                                },
+                                listaEstoques = listaDeEstoques.value
+                            )
 
-                        "MATERIAL" -> TelaFormularioMaterial(
-                            aoSalvar = { novoMaterial ->
-                                listaDeMateriais.value =
-                                    listaDeMateriais.value + novoMaterial
-                            }
-                        )
+                            "CLIENTE" -> TelaFormularioCliente(
+                                aoSalvar = { novoCliente ->
+                                    listaDeClientes.value =
+                                        listaDeClientes.value + novoCliente
+                                }
+                            )
 
-                        "FORNECEDOR" -> TelaFormularioFornecedor(
-                            aoSalvar = { novoFornecedor ->
-                                listaDeFornecedores.value =
-                                    listaDeFornecedores.value + novoFornecedor
-                            }
-                        )
+                            "PEDIDO" -> TelaFormularioPedido(
+                                aoSalvar = { novoPedido ->
+                                    listaDePedidos.value =
+                                        listaDePedidos.value + novoPedido
+                                }
+                            )
+
+                            "MATERIAL" -> TelaFormularioMaterial(
+                                aoSalvar = { novoMaterial ->
+                                    listaDeMateriais.value =
+                                        listaDeMateriais.value + novoMaterial
+                                }
+                            )
+
+                            "FORNECEDOR" -> TelaFormularioFornecedor(
+                                aoSalvar = { novoFornecedor ->
+                                    listaDeFornecedores.value =
+                                        listaDeFornecedores.value + novoFornecedor
+                                }
+                            )
+                        }
                     }
                 }
             }
