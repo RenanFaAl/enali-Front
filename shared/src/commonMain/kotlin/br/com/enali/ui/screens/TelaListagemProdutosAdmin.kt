@@ -31,8 +31,11 @@ fun TelaListagemProdutosAdmin(
     var pesquisa by remember { mutableStateOf("") }
     var carregando by remember { mutableStateOf(false) }
     var erroApi by remember { mutableStateOf<String?>(null) }
+    var mensagemSucesso by remember { mutableStateOf<String?>(null) }
 
     var produtoEmFormulario by remember { mutableStateOf<Produto?>(null) }
+    var produtoParaExcluir by remember { mutableStateOf<Produto?>(null) }
+    var excluindoProduto by remember { mutableStateOf(false) }
 
     fun carregarProdutos() {
         escopo.launch {
@@ -58,6 +61,27 @@ fun TelaListagemProdutosAdmin(
                     erroApi = erro.message ?: "Não foi possível carregar os produtos."
                 }
             carregando = false
+        }
+    }
+
+    fun confirmarExclusaoProduto(produto: Produto) {
+        if (excluindoProduto) return
+        excluindoProduto = true
+        erroApi = null
+        mensagemSucesso = null
+
+        escopo.launch {
+            apiClient.excluirProduto(token = tokenAdmin, id = produto.id)
+                .onSuccess {
+                    aoAtualizarLista(listaProdutos.filterNot { it.id == produto.id })
+                    mensagemSucesso = "Produto \"${produto.nome}\" excluído com sucesso."
+                    produtoParaExcluir = null
+                }
+                .onFailure { erro ->
+                    erroApi = erro.message ?: "Não foi possível excluir o produto."
+                    produtoParaExcluir = null
+                }
+            excluindoProduto = false
         }
     }
 
@@ -87,6 +111,95 @@ fun TelaListagemProdutosAdmin(
             }
         )
         return
+    }
+
+    produtoParaExcluir?.let { alvo ->
+        AlertDialog(
+            onDismissRequest = {
+                if (!excluindoProduto) {
+                    produtoParaExcluir = null
+                }
+            },
+            containerColor = CorBranco,
+            title = {
+                Text(
+                    text = "Confirmar exclusão do produto",
+                    color = CorMarromEscuro,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Tem certeza de que deseja excluir permanentemente este produto?",
+                        color = CorMarromEscuro
+                    )
+
+                    Surface(
+                        color = Color(0xFFFAF8F5),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, CorBegeMedio.copy(alpha = 0.55f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "ID: ${alvo.id}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF71665C)
+                            )
+                            Text(
+                                text = "Nome: ${alvo.nome}",
+                                fontWeight = FontWeight.SemiBold,
+                                color = CorMarromEscuro
+                            )
+                            Text(
+                                text = "Descrição: ${alvo.descricao}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF71665C)
+                            )
+                            Text(
+                                text = "Preço: ${formatarPrecoProduto(alvo.preco)}  |  Desconto: ${alvo.desconto}%",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF71665C)
+                            )
+                            Text(
+                                text = "Status: ${if (alvo.disponivel) "Ativo" else "Inativo"}  |  Imagens: ${alvo.imagensUrls.size}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF71665C)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { confirmarExclusaoProduto(alvo) },
+                    enabled = !excluindoProduto,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = if (excluindoProduto) "Excluindo..." else "Sim, excluir",
+                        color = CorBranco
+                    )
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { produtoParaExcluir = null },
+                    enabled = !excluindoProduto,
+                    border = BorderStroke(1.dp, CorMarromEscuro),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Cancelar", color = CorMarromEscuro)
+                }
+            }
+        )
     }
 
     val produtosFiltrados = listaProdutos.filter {
@@ -152,6 +265,16 @@ fun TelaListagemProdutosAdmin(
                 focusedLabelColor = CorMarromEscuro
             )
         )
+
+        mensagemSucesso?.let {
+            Surface(
+                color = Color(0xFFE8F5E9),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(it, color = Color(0xFF2E7D32), modifier = Modifier.padding(14.dp))
+            }
+        }
 
         erroApi?.let {
             Surface(
@@ -220,12 +343,23 @@ fun TelaListagemProdutosAdmin(
                                 }
                             }
 
-                            OutlinedButton(
-                                onClick = { produtoEmFormulario = produto },
-                                border = BorderStroke(1.dp, CorMarromEscuro),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Text("Atualizar", color = CorMarromEscuro)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(
+                                    onClick = { produtoEmFormulario = produto },
+                                    border = BorderStroke(1.dp, CorMarromEscuro),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("Atualizar", color = CorMarromEscuro)
+                                }
+
+                                OutlinedButton(
+                                    onClick = { produtoParaExcluir = produto },
+                                    enabled = !carregando && !excluindoProduto,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("Excluir", color = MaterialTheme.colorScheme.error)
+                                }
                             }
                         }
 
