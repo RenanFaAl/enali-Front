@@ -1,3 +1,4 @@
+
 package br.com.enali
 
 import androidx.compose.foundation.background
@@ -26,14 +27,22 @@ import br.com.enali.ui.theme.CorMarromEscuro
 @Composable
 fun App() {
     val apiClient = remember { EnaliApiClient() }
+
     DisposableEffect(apiClient) {
         onDispose { apiClient.fechar() }
     }
 
-    var sessao by remember { mutableStateOf<SessaoUsuario>(SessaoUsuario.Visitante) }
-    var identificadorTelaAtual by remember { mutableStateOf(RotaEnali.VISITANTE.rotaInicial) }
+    var sessao by remember {
+        mutableStateOf<SessaoUsuario>(SessaoUsuario.Visitante)
+    }
 
-    val rotasPermitidas = remember(sessao) { RotaEnali.rotasPermitidas(sessao) }
+    var identificadorTelaAtual by remember {
+        mutableStateOf(RotaEnali.VISITANTE.rotaInicial)
+    }
+
+    val rotasPermitidas = remember(sessao) {
+        RotaEnali.rotasPermitidas(sessao)
+    }
 
     LaunchedEffect(sessao, rotasPermitidas) {
         if (identificadorTelaAtual !in rotasPermitidas) {
@@ -41,16 +50,37 @@ fun App() {
         }
     }
 
-    val listaDeAdministradores = remember { mutableStateOf(listOf<Administrador>()) }
-    val listaDeEnderecos = remember { mutableStateOf(listOf<Endereco>()) }
-    val listaDeProdutos = remember { mutableStateOf(listOf<Produto>()) }
-    val listaDeEstoques = remember { mutableStateOf(listOf<Estoque>()) }
-    val listaDeClientes = remember { mutableStateOf(listOf<Cliente>()) }
-    val listaDePedidos = remember { mutableStateOf(listOf<Pedido>()) }
-    val listaDeMateriais = remember { mutableStateOf(listOf<Material>()) }
-    val listaDeFornecedores = remember { mutableStateOf(listOf<Fornecedor>()) }
+    val listaDeAdministradores = remember {
+        mutableStateOf(listOf<Administrador>())
+    }
+    val listaDeEnderecos = remember {
+        mutableStateOf(listOf<Endereco>())
+    }
+    val listaDeProdutos = remember {
+        mutableStateOf(listOf<Produto>())
+    }
+    val listaDeEstoques = remember {
+        mutableStateOf(listOf<Estoque>())
+    }
+    val listaDeClientes = remember {
+        mutableStateOf(listOf<Cliente>())
+    }
+    val listaDePedidos = remember {
+        mutableStateOf(listOf<Pedido>())
+    }
+    val listaDeMateriais = remember {
+        mutableStateOf(listOf<Material>())
+    }
+    val listaDeFornecedores = remember {
+        mutableStateOf(listOf<Fornecedor>())
+    }
+
+    var itensCarrinho by remember {
+        mutableStateOf(listOf<ItemCarrinhoEnali>())
+    }
 
     val aoSair = {
+        itensCarrinho = emptyList()
         sessao = SessaoUsuario.Visitante
         identificadorTelaAtual = RotaEnali.VISITANTE.rotaInicial
     }
@@ -73,8 +103,10 @@ fun App() {
                 val statusSessao = when (val s = sessao) {
                     is SessaoUsuario.Visitante -> "Visitante"
                     is SessaoUsuario.ClienteLogado -> "Cliente: ${s.nome}"
-                    is SessaoUsuario.AdminLogado -> "Admin (${s.nivelAcesso}): ${s.nome}"
+                    is SessaoUsuario.AdminLogado ->
+                        "Admin (${s.nivelAcesso}): ${s.nome}"
                 }
+
                 Surface(
                     color = CorBegeMedio,
                     modifier = Modifier.fillMaxWidth()
@@ -82,7 +114,10 @@ fun App() {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .padding(
+                                horizontal = 16.dp,
+                                vertical = 8.dp
+                            ),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
@@ -90,6 +125,7 @@ fun App() {
                             color = CorMarromEscuro,
                             style = MaterialTheme.typography.bodyMedium
                         )
+
                         Text(
                             text = statusSessao,
                             color = CorMarromEscuro,
@@ -136,37 +172,96 @@ fun App() {
                         when (identificadorTelaAtual) {
                             "LOGIN_CLIENTE" -> TelaLoginCliente(
                                 apiClient = apiClient,
-                                aoLoginSucesso = { aoLogarComSucesso(it) },
-                                aoIrParaCadastro = { identificadorTelaAtual = "CADASTRO_CLIENTE" },
-                                aoIrParaLoginAdmin = { identificadorTelaAtual = "LOGIN_ADMIN" }
+                                aoLoginSucesso = {
+                                    aoLogarComSucesso(it)
+                                },
+                                aoIrParaCadastro = {
+                                    identificadorTelaAtual = "CADASTRO_CLIENTE"
+                                },
+                                aoIrParaLoginAdmin = {
+                                    identificadorTelaAtual = "LOGIN_ADMIN"
+                                }
                             )
 
                             "LOGIN_ADMIN" -> TelaLoginAdmin(
                                 apiClient = apiClient,
-                                aoLoginSucesso = { aoLogarComSucesso(it) },
-                                aoVoltarCliente = { identificadorTelaAtual = "LOGIN_CLIENTE" }
+                                aoLoginSucesso = {
+                                    aoLogarComSucesso(it)
+                                },
+                                aoVoltarCliente = {
+                                    identificadorTelaAtual = "LOGIN_CLIENTE"
+                                }
                             )
 
                             "CADASTRO_CLIENTE" -> TelaFormularioCliente(
                                 apiClient = apiClient,
                                 aoSalvar = { novoCliente ->
-                                    listaDeClientes.value = listaDeClientes.value + novoCliente
+                                    listaDeClientes.value =
+                                        listaDeClientes.value + novoCliente
                                 },
-                                aoVoltarLogin = { identificadorTelaAtual = "LOGIN_CLIENTE" }
+                                aoVoltarLogin = {
+                                    identificadorTelaAtual = "LOGIN_CLIENTE"
+                                }
                             )
 
-                            "VITRINE" -> Text(
-                                text = "Vitrine de Produtos",
-                                color = CorMarromEscuro,
-                                style = MaterialTheme.typography.headlineSmall,
-                                modifier = Modifier.padding(24.dp)
+                            "VITRINE" -> TelaVitrineEnali(
+                                apiClient = apiClient,
+                                quantidadeCarrinho = itensCarrinho.sumOf {
+                                    it.quantidade
+                                },
+                                aoAdicionarAoCarrinho = { produto ->
+                                    val anterior = itensCarrinho.find {
+                                        it.produto.id == produto.id
+                                    }
+
+                                    itensCarrinho = if (anterior == null) {
+                                        itensCarrinho +
+                                            ItemCarrinhoEnali(produto, 1)
+                                    } else {
+                                        itensCarrinho.map {
+                                            if (it.produto.id == produto.id) {
+                                                it.copy(
+                                                    quantidade = it.quantidade + 1
+                                                )
+                                            } else {
+                                                it
+                                            }
+                                        }
+                                    }
+                                },
+                                aoAbrirCarrinho = {
+                                    identificadorTelaAtual = "CARRINHO"
+                                }
                             )
 
-                            "CARRINHO" -> Text(
-                                text = "Carrinho de Compras",
-                                color = CorMarromEscuro,
-                                style = MaterialTheme.typography.headlineSmall,
-                                modifier = Modifier.padding(24.dp)
+                            "CARRINHO" -> TelaCarrinhoEnali(
+                                apiClient = apiClient,
+                                itens = itensCarrinho,
+                                aoAlterarQuantidade = { id, quantidade ->
+                                    itensCarrinho = if (quantidade <= 0) {
+                                        itensCarrinho.filterNot {
+                                            it.produto.id == id
+                                        }
+                                    } else {
+                                        itensCarrinho.map {
+                                            if (it.produto.id == id) {
+                                                it.copy(
+                                                    quantidade = quantidade
+                                                )
+                                            } else {
+                                                it
+                                            }
+                                        }
+                                    }
+                                },
+                                aoRemover = { id ->
+                                    itensCarrinho = itensCarrinho.filterNot {
+                                        it.produto.id == id
+                                    }
+                                },
+                                aoVoltarVitrine = {
+                                    identificadorTelaAtual = "VITRINE"
+                                }
                             )
 
                             "MEUS_PEDIDOS", "MEUS_ENDERECOS" -> Text(
@@ -178,6 +273,7 @@ fun App() {
 
                             "MEU_CADASTRO" -> {
                                 val s = sessao as? SessaoUsuario.ClienteLogado
+
                                 if (s != null) {
                                     TelaPerfilCliente(
                                         apiClient = apiClient,
@@ -193,6 +289,7 @@ fun App() {
 
                             "MEU_PERFIL_ADMIN" -> {
                                 val s = sessao as? SessaoUsuario.AdminLogado
+
                                 if (s != null) {
                                     TelaPerfilAdmin(
                                         apiClient = apiClient,
@@ -208,7 +305,9 @@ fun App() {
                             }
 
                             "ADMINISTRADOR" -> {
-                                val sessaoAdmin = sessao as? SessaoUsuario.AdminLogado
+                                val sessaoAdmin =
+                                    sessao as? SessaoUsuario.AdminLogado
+
                                 if (sessaoAdmin != null && sessaoAdmin.isMaster) {
                                     TelaFormularioAdministrador(
                                         apiClient = apiClient,
@@ -236,7 +335,9 @@ fun App() {
                             )
 
                             "PRODUTO" -> {
-                                val sessaoAdmin = sessao as? SessaoUsuario.AdminLogado
+                                val sessaoAdmin =
+                                    sessao as? SessaoUsuario.AdminLogado
+
                                 if (sessaoAdmin != null) {
                                     TelaListagemProdutosAdmin(
                                         apiClient = apiClient,
@@ -256,15 +357,21 @@ fun App() {
                             }
 
                             "ESTOQUE" -> {
-                                val sessaoAdmin = sessao as? SessaoUsuario.AdminLogado
+                                val sessaoAdmin =
+                                    sessao as? SessaoUsuario.AdminLogado
+
                                 if (sessaoAdmin != null) {
                                     TelaListagemEstoqueAdmin(
                                         apiClient = apiClient,
                                         tokenAdmin = sessaoAdmin.token,
                                         listaProdutos = listaDeProdutos.value,
-                                        aoAtualizarProdutos = { listaDeProdutos.value = it },
+                                        aoAtualizarProdutos = {
+                                            listaDeProdutos.value = it
+                                        },
                                         listaEstoques = listaDeEstoques.value,
-                                        aoAtualizarLista = { listaDeEstoques.value = it }
+                                        aoAtualizarLista = {
+                                            listaDeEstoques.value = it
+                                        }
                                     )
                                 } else {
                                     Text(
