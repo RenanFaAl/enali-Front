@@ -1,4 +1,3 @@
-
 package br.com.enali.ui.screens
 
 import androidx.compose.foundation.BorderStroke
@@ -15,72 +14,62 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import br.com.enali.model.Produto
+import br.com.enali.network.EnaliApiClient
+import br.com.enali.network.dto.ProdutoRequest
 import br.com.enali.ui.components.CampoTextoCustomizado
 import br.com.enali.ui.theme.CorBegeMedio
 import br.com.enali.ui.theme.CorBranco
 import br.com.enali.ui.theme.CorFundoClaro
 import br.com.enali.ui.theme.CorMarromEscuro
+import kotlinx.coroutines.launch
 import kotlin.math.roundToLong
-import kotlin.random.Random
 
-private fun formatarPrecoProduto(valor: Double): String {
+internal fun formatarPrecoProduto(valor: Double): String {
     if (!valor.isFinite()) return "R$ 0,00"
-
     val centavos = (valor * 100).roundToLong()
     val reais = centavos / 100
     val resto = (centavos % 100).toString().padStart(2, '0')
-
     return "R$ $reais,$resto"
 }
 
 @Composable
 fun TelaFormularioProduto(
+    apiClient: EnaliApiClient,
+    tokenAdmin: String,
+    produtoEmEdicao: Produto? = null,
     aoSalvar: (Produto) -> Unit,
-    listaProdutos: List<Produto> = emptyList()
+    aoCancelar: (() -> Unit)? = null
 ) {
-    var nomeProduto by remember { mutableStateOf("") }
-    var descricaoProduto by remember { mutableStateOf("") }
-    var precoProduto by remember { mutableStateOf("") }
-    var descontoProduto by remember { mutableStateOf("0") }
-    var estaDisponivel by remember { mutableStateOf(true) }
-    var pesquisa by remember { mutableStateOf("") }
+    val escopo = rememberCoroutineScope()
+    val estaEditando = produtoEmEdicao != null
+
+    var nomeProduto by remember(produtoEmEdicao) { mutableStateOf(produtoEmEdicao?.nome ?: "") }
+    var descricaoProduto by remember(produtoEmEdicao) { mutableStateOf(produtoEmEdicao?.descricao ?: "") }
+    var precoProduto by remember(produtoEmEdicao) {
+        mutableStateOf(produtoEmEdicao?.preco?.toString()?.replace('.', ',') ?: "")
+    }
+    var descontoProduto by remember(produtoEmEdicao) {
+        mutableStateOf(produtoEmEdicao?.desconto?.toString()?.replace('.', ',') ?: "0")
+    }
+    var estaDisponivel by remember(produtoEmEdicao) { mutableStateOf(produtoEmEdicao?.disponivel ?: true) }
 
     var erroNome by remember { mutableStateOf<String?>(null) }
     var erroDescricao by remember { mutableStateOf<String?>(null) }
     var erroPreco by remember { mutableStateOf<String?>(null) }
     var erroDesconto by remember { mutableStateOf<String?>(null) }
+    var erroApi by remember { mutableStateOf<String?>(null) }
     var mensagemSucesso by remember { mutableStateOf<String?>(null) }
+    var carregando by remember { mutableStateOf(false) }
 
     val precoDigitado = precoProduto.replace(",", ".").toDoubleOrNull()
     val descontoDigitado = descontoProduto.replace(",", ".").toDoubleOrNull()
 
-    val precoResumo = if (
-        precoDigitado != null &&
-        precoDigitado.isFinite() &&
-        precoDigitado > 0
-    ) {
-        precoDigitado
-    } else null
-
-    val descontoResumo = if (
-        descontoDigitado != null &&
-        descontoDigitado.isFinite() &&
-        descontoDigitado in 0.0..100.0
-    ) {
-        descontoDigitado
-    } else null
-
-    val valorDesconto = if (
-        precoResumo != null &&
-        descontoResumo != null
-    ) {
+    val precoResumo = precoDigitado?.takeIf { it.isFinite() && it > 0 }
+    val descontoResumo = descontoDigitado?.takeIf { it.isFinite() && it in 0.0..100.0 }
+    val valorDesconto = if (precoResumo != null && descontoResumo != null) {
         precoResumo * descontoResumo / 100.0
     } else null
-
-    val precoFinal = if (
-        precoResumo != null &&
-        valorDesconto != null
-    ) {
+    val precoFinal = if (precoResumo != null && valorDesconto != null) {
         precoResumo - valorDesconto
     } else null
 
@@ -94,6 +83,7 @@ fun TelaFormularioProduto(
         erroDescricao = null
         erroPreco = null
         erroDesconto = null
+        erroApi = null
     }
 
     val gravarProduto = {
@@ -102,34 +92,26 @@ fun TelaFormularioProduto(
 
         erroNome = when {
             nomeProduto.isBlank() -> "O nome é obrigatório"
-            nomeProduto.length > 120 ->
-                "O nome deve ter no máximo 120 caracteres"
+            nomeProduto.trim().length > 120 -> "O nome deve ter no máximo 120 caracteres"
             else -> null
         }
 
         erroDescricao = when {
             descricaoProduto.isBlank() -> "A descrição é obrigatória"
-            descricaoProduto.length > 500 ->
-                "A descrição deve ter no máximo 500 caracteres"
+            descricaoProduto.trim().length > 500 -> "A descrição deve ter no máximo 500 caracteres"
             else -> null
         }
 
-        erroPreco = if (
-            precoValor == null ||
-            !precoValor.isFinite() ||
-            precoValor <= 0
-        ) {
+        erroPreco = if (precoValor == null || !precoValor.isFinite() || precoValor <= 0) {
             "Informe um preço válido maior que zero"
         } else null
 
-        erroDesconto = if (
-            descontoValor == null ||
-            !descontoValor.isFinite() ||
-            descontoValor < 0 ||
-            descontoValor > 100
-        ) {
+        erroDesconto = if (descontoValor == null || !descontoValor.isFinite() || descontoValor < 0 || descontoValor > 100) {
             "O desconto deve estar entre 0 e 100"
         } else null
+
+        erroApi = null
+        mensagemSucesso = null
 
         if (
             erroNome == null &&
@@ -137,463 +119,210 @@ fun TelaFormularioProduto(
             erroPreco == null &&
             erroDesconto == null &&
             precoValor != null &&
-            descontoValor != null
+            descontoValor != null &&
+            !carregando
         ) {
-            aoSalvar(
-                Produto(
-                    id = Random.nextLong(1000L, 999999L),
-                    nome = nomeProduto.trim(),
-                    descricao = descricaoProduto.trim(),
-                    preco = precoValor,
-                    disponivel = estaDisponivel,
-                    desconto = descontoValor
-                )
+            carregando = true
+            val request = ProdutoRequest(
+                nome = nomeProduto.trim(),
+                descricao = descricaoProduto.trim(),
+                preco = precoValor,
+                disponivel = estaDisponivel,
+                desconto = descontoValor
             )
-
-            mensagemSucesso = "Produto cadastrado com sucesso!"
-            limparCampos()
-        } else {
-            mensagemSucesso = null
+            escopo.launch {
+                val resultado = if (produtoEmEdicao != null) {
+                    apiClient.atualizarProduto(tokenAdmin, produtoEmEdicao.id, request)
+                } else {
+                    apiClient.cadastrarProduto(tokenAdmin, request)
+                }
+                carregando = false
+                resultado
+                    .onSuccess { resp ->
+                        aoSalvar(
+                            Produto(
+                                id = resp.id,
+                                nome = resp.nome,
+                                descricao = resp.descricao,
+                                preco = resp.preco,
+                                disponivel = resp.disponivel,
+                                desconto = resp.desconto
+                            )
+                        )
+                        mensagemSucesso = if (estaEditando) {
+                            "Produto atualizado com sucesso!"
+                        } else {
+                            "Produto cadastrado com sucesso!"
+                        }
+                        if (!estaEditando) limparCampos()
+                    }
+                    .onFailure { erro ->
+                        erroApi = erro.message ?: "Não foi possível salvar o produto."
+                    }
+            }
         }
     }
 
-    val produtosVisiveis = listaProdutos.filter {
-        it.nome.contains(pesquisa, ignoreCase = true)
-    }
-
-    BoxWithConstraints(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(CorFundoClaro)
+            .background(CorBranco)
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        val telaLarga = maxWidth >= 880.dp
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Produtos",
+                text = if (estaEditando) "Atualizar Produto" else "Novo Produto",
                 color = CorMarromEscuro,
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold
             )
-
-            Text(
-                text = "Cadastre e consulte os produtos do sistema.",
-                color = Color(0xFF71665C),
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            mensagemSucesso?.let {
-                Surface(
-                    color = Color(0xFFE8F5E9),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = it,
-                        color = Color(0xFF2E7D32),
-                        modifier = Modifier.padding(14.dp)
-                    )
+            if (aoCancelar != null) {
+                OutlinedButton(onClick = aoCancelar, enabled = !carregando) {
+                    Text("Voltar para lista", color = CorMarromEscuro)
                 }
-            }
-
-            val formulario: @Composable () -> Unit = {
-                PainelProduto(
-                    titulo = "Novo produto",
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = "Preencha as informações para cadastrar um produto.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF71665C)
-                    )
-
-                    CampoTextoCustomizado(
-                        value = nomeProduto,
-                        onValueChange = {
-                            nomeProduto = it
-                            erroNome = null
-                        },
-                        label = "Nome do produto",
-                        placeholder = "Caneca personalizada",
-                        isError = erroNome != null
-                    )
-
-                    erroNome?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
-                    }
-
-                    OutlinedTextField(
-                        value = descricaoProduto,
-                        onValueChange = {
-                            descricaoProduto = it
-                            erroDescricao = null
-                        },
-                        label = { Text("Descrição") },
-                        placeholder = { Text("Descrição do produto") },
-                        minLines = 3,
-                        maxLines = 5,
-                        isError = erroDescricao != null,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = CorMarromEscuro,
-                            focusedLabelColor = CorMarromEscuro,
-                            cursorColor = CorMarromEscuro
-                        )
-                    )
-
-                    erroDescricao?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            CampoTextoCustomizado(
-                                value = precoProduto,
-                                onValueChange = {
-                                    precoProduto = it
-                                    erroPreco = null
-                                },
-                                label = "Preço (R$)",
-                                placeholder = "35,90",
-                                isError = erroPreco != null
-                            )
-
-                            erroPreco?.let {
-                                Text(
-                                    it,
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        }
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            CampoTextoCustomizado(
-                                value = descontoProduto,
-                                onValueChange = {
-                                    descontoProduto = it
-                                    erroDesconto = null
-                                },
-                                label = "Desconto (%)",
-                                placeholder = "0",
-                                isError = erroDesconto != null
-                            )
-
-                            erroDesconto?.let {
-                                Text(
-                                    it,
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        }
-                    }
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 5.dp),
-                        verticalArrangement = Arrangement.spacedBy(9.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                "Preço original",
-                                color = Color(0xFF71665C),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-
-                            Text(
-                                precoResumo?.let {
-                                    formatarPrecoProduto(it)
-                                } ?: "R$ 0,00",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                "Desconto${descontoResumo?.let { " (${it}%)" } ?: ""}",
-                                color = Color(0xFF71665C),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-
-                            Text(
-                                valorDesconto?.let {
-                                    "- ${formatarPrecoProduto(it)}"
-                                } ?: "R$ 0,00",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "Preço final",
-                                fontWeight = FontWeight.SemiBold,
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-
-                            Text(
-                                precoFinal?.let {
-                                    formatarPrecoProduto(it)
-                                } ?: "R$ 0,00",
-                                color = CorMarromEscuro,
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    Surface(
-                        color = CorFundoClaro,
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "Disponível para venda",
-                                    fontWeight = FontWeight.Medium
-                                )
-
-                                Text(
-                                    if (estaDisponivel) {
-                                        "Produto ativo"
-                                    } else {
-                                        "Produto indisponível"
-                                    },
-                                    color = Color(0xFF71665C),
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-
-                            Switch(
-                                checked = estaDisponivel,
-                                onCheckedChange = {
-                                    estaDisponivel = it
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedTrackColor = CorMarromEscuro
-                                )
-                            )
-                        }
-                    }
-
-                    Spacer(Modifier.height(4.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Button(
-                            onClick = gravarProduto,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(48.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = CorMarromEscuro
-                            ),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Text("Gravar", color = CorBranco)
-                        }
-
-                        OutlinedButton(
-                            onClick = {
-                                limparCampos()
-                                mensagemSucesso = null
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(48.dp),
-                            border = BorderStroke(
-                                1.dp,
-                                CorMarromEscuro
-                            ),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Text(
-                                "Limpar campos",
-                                color = CorMarromEscuro
-                            )
-                        }
-                    }
-                }
-            }
-
-            val listagem: @Composable () -> Unit = {
-                PainelProduto(
-                    titulo = "Produtos cadastrados (${listaProdutos.size})",
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    OutlinedTextField(
-                        value = pesquisa,
-                        onValueChange = {
-                            pesquisa = it
-                        },
-                        label = {
-                            Text("Buscar produto")
-                        },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = CorMarromEscuro,
-                            focusedLabelColor = CorMarromEscuro
-                        )
-                    )
-
-                    if (produtosVisiveis.isEmpty()) {
-                        Text(
-                            text = if (listaProdutos.isEmpty()) {
-                                "Nenhum produto cadastrado ainda."
-                            } else {
-                                "Nenhum produto encontrado."
-                            },
-                            color = Color(0xFF71665C),
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(vertical = 16.dp)
-                        )
-                    } else {
-                        Column(
-                            modifier = Modifier
-                                .heightIn(max = 480.dp)
-                                .verticalScroll(rememberScrollState())
-                        ) {
-                            produtosVisiveis.forEach { produto ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 12.dp),
-                                    horizontalArrangement =
-                                        Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text(
-                                            produto.nome,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-
-                                        Text(
-                                            text = "R$ ${produto.preco.toString().replace('.', ',')}  |  Desconto: ${produto.desconto}%",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = Color(0xFF71665C)
-                                        )
-                                    }
-
-                                    Surface(
-                                        color = if (produto.disponivel) {
-                                            Color(0xFFE8F1E3)
-                                        } else {
-                                            CorFundoClaro
-                                        },
-                                        shape = RoundedCornerShape(20.dp)
-                                    ) {
-                                        Text(
-                                            text = if (produto.disponivel) {
-                                                "Ativo"
-                                            } else {
-                                                "Inativo"
-                                            },
-                                            modifier = Modifier.padding(
-                                                horizontal = 10.dp,
-                                                vertical = 5.dp
-                                            ),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = if (produto.disponivel) {
-                                                Color(0xFF37643A)
-                                            } else {
-                                                CorMarromEscuro
-                                            }
-                                        )
-                                    }
-                                }
-
-                                HorizontalDivider(
-                                    color = CorBegeMedio.copy(alpha = 0.45f)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (telaLarga) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(18.dp),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Box(Modifier.weight(1f)) {
-                        formulario()
-                    }
-
-                    Box(Modifier.weight(1f)) {
-                        listagem()
-                    }
-                }
-            } else {
-                formulario()
-                listagem()
             }
         }
-    }
-}
 
-@Composable
-private fun PainelProduto(
-    titulo: String,
-    modifier: Modifier = Modifier,
-    conteudo: @Composable ColumnScope.() -> Unit
-) {
-    Surface(
-        modifier = modifier,
-        color = CorBranco,
-        shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(
-            1.dp,
-            CorBegeMedio.copy(alpha = 0.55f)
-        ),
-        shadowElevation = 2.dp
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+        erroApi?.let {
+            Surface(
+                color = MaterialTheme.colorScheme.errorContainer,
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(it, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(14.dp))
+            }
+        }
+
+        mensagemSucesso?.let {
+            Surface(
+                color = Color(0xFFE8F5E9),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(it, color = Color(0xFF2E7D32), modifier = Modifier.padding(14.dp))
+            }
+        }
+
+        Surface(
+            color = CorBranco,
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, CorBegeMedio.copy(alpha = 0.55f)),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text(
-                titulo,
-                color = CorMarromEscuro,
-                fontWeight = FontWeight.SemiBold,
-                style = MaterialTheme.typography.titleMedium
-            )
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                CampoTextoCustomizado(
+                    value = nomeProduto,
+                    onValueChange = { nomeProduto = it; erroNome = null },
+                    label = "Nome do produto",
+                    placeholder = "Caneca personalizada",
+                    isError = erroNome != null
+                )
+                erroNome?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
-            HorizontalDivider(
-                color = CorBegeMedio.copy(alpha = 0.55f)
-            )
+                OutlinedTextField(
+                    value = descricaoProduto,
+                    onValueChange = { descricaoProduto = it; erroDescricao = null },
+                    label = { Text("Descrição") },
+                    placeholder = { Text("Descrição do produto") },
+                    minLines = 3,
+                    maxLines = 5,
+                    isError = erroDescricao != null,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                erroDescricao?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
-            conteudo()
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        CampoTextoCustomizado(
+                            value = precoProduto,
+                            onValueChange = { precoProduto = it; erroPreco = null },
+                            label = "Preço (R$)",
+                            placeholder = "35,90",
+                            isError = erroPreco != null
+                        )
+                        erroPreco?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        CampoTextoCustomizado(
+                            value = descontoProduto,
+                            onValueChange = { descontoProduto = it; erroDesconto = null },
+                            label = "Desconto (%)",
+                            placeholder = "0",
+                            isError = erroDesconto != null
+                        )
+                        erroDesconto?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                    }
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Preço original", color = Color(0xFF71665C))
+                    Text(precoResumo?.let(::formatarPrecoProduto) ?: "R$ 0,00")
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Desconto${descontoResumo?.let { " (${it}%)" } ?: ""}", color = Color(0xFF71665C))
+                    Text(valorDesconto?.let { "- ${formatarPrecoProduto(it)}" } ?: "R$ 0,00")
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Preço final", fontWeight = FontWeight.SemiBold)
+                    Text(
+                        precoFinal?.let(::formatarPrecoProduto) ?: "R$ 0,00",
+                        color = CorMarromEscuro,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Disponível para venda", fontWeight = FontWeight.Medium)
+                    Switch(
+                        checked = estaDisponivel,
+                        onCheckedChange = { estaDisponivel = it },
+                        colors = SwitchDefaults.colors(checkedTrackColor = CorMarromEscuro)
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = gravarProduto,
+                        enabled = !carregando,
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = CorMarromEscuro),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            when {
+                                carregando -> "Salvando..."
+                                estaEditando -> "Atualizar Produto"
+                                else -> "Gravar"
+                            },
+                            color = CorBranco
+                        )
+                    }
+
+                    if (!estaEditando) {
+                        OutlinedButton(
+                            onClick = { limparCampos(); mensagemSucesso = null },
+                            enabled = !carregando,
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Limpar campos", color = CorMarromEscuro)
+                        }
+                    }
+                }
+            }
         }
     }
 }

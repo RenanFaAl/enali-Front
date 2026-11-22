@@ -235,22 +235,45 @@ fun App() {
                                 }
                             )
 
-                            "PRODUTO" -> TelaFormularioProduto(
-                                aoSalvar = { novoProduto ->
-                                    listaDeProdutos.value =
-                                        listaDeProdutos.value + novoProduto
-                                },
-                                listaProdutos = listaDeProdutos.value
-                            )
+                            "PRODUTO" -> {
+                                val sessaoAdmin = sessao as? SessaoUsuario.AdminLogado
+                                if (sessaoAdmin != null) {
+                                    TelaListagemProdutosAdmin(
+                                        apiClient = apiClient,
+                                        tokenAdmin = sessaoAdmin.token,
+                                        listaProdutos = listaDeProdutos.value,
+                                        aoAtualizarLista = { novaLista ->
+                                            listaDeProdutos.value = novaLista
+                                        }
+                                    )
+                                } else {
+                                    Text(
+                                        text = "Acesso restrito a administradores.",
+                                        color = CorMarromEscuro,
+                                        modifier = Modifier.padding(24.dp)
+                                    )
+                                }
+                            }
 
-                            "ESTOQUE" -> TelaFormularioEstoque(
-                                listaProdutos = listaDeProdutos.value,
-                                aoSalvar = { novoEstoque ->
-                                    listaDeEstoques.value =
-                                        listaDeEstoques.value + novoEstoque
-                                },
-                                listaEstoques = listaDeEstoques.value
-                            )
+                            "ESTOQUE" -> {
+                                val sessaoAdmin = sessao as? SessaoUsuario.AdminLogado
+                                if (sessaoAdmin != null) {
+                                    TelaListagemEstoqueAdmin(
+                                        apiClient = apiClient,
+                                        tokenAdmin = sessaoAdmin.token,
+                                        listaProdutos = listaDeProdutos.value,
+                                        aoAtualizarProdutos = { listaDeProdutos.value = it },
+                                        listaEstoques = listaDeEstoques.value,
+                                        aoAtualizarLista = { listaDeEstoques.value = it }
+                                    )
+                                } else {
+                                    Text(
+                                        text = "Acesso restrito a administradores.",
+                                        color = CorMarromEscuro,
+                                        modifier = Modifier.padding(24.dp)
+                                    )
+                                }
+                            }
 
                             "CLIENTE" -> TelaFormularioCliente(
                                 apiClient = apiClient,
