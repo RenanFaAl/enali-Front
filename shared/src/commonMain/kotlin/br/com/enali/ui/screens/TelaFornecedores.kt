@@ -29,8 +29,6 @@ fun TelaFornecedores(apiClient: EnaliApiClient, token: String) {
     var erro by remember { mutableStateOf<String?>(null) }
     var sucesso by remember { mutableStateOf<String?>(null) }
     var busca by remember { mutableStateOf("") }
-    var formularioAberto by remember { mutableStateOf(false) }
-    var emEdicao by remember { mutableStateOf<FornecedorResponse?>(null) }
     var enderecosDe by remember { mutableStateOf<FornecedorResponse?>(null) }
     var enderecosPorFornecedor by remember { mutableStateOf<Map<Long, List<EnderecoResponse>>>(emptyMap()) }
 
@@ -66,24 +64,6 @@ fun TelaFornecedores(apiClient: EnaliApiClient, token: String) {
         return
     }
 
-    if (formularioAberto) {
-        FormularioFornecedor(
-            inicial = emEdicao,
-            aoSalvar = { request ->
-                val alvo = emEdicao
-                (if (alvo == null) api.cadastrar(token, request) else api.atualizar(token, alvo.id, request))
-                    .onSuccess { salvo ->
-                        sucesso = if (alvo == null) "Fornecedor cadastrado. Agora cadastre o endereço." else "Fornecedor atualizado."
-                        recarregar() // antes de fechar: o formulário sai da tela e cancela o escopo dele
-                        formularioAberto = false
-                        emEdicao = null
-                        if (alvo == null) enderecosDe = salvo // novo fornecedor já segue para os endereços
-                    }
-            },
-            aoCancelar = { formularioAberto = false; emEdicao = null }
-        )
-        return
-    }
 
     val filtrados = fornecedores.filter {
         busca.isBlank() ||
@@ -91,74 +71,96 @@ fun TelaFornecedores(apiClient: EnaliApiClient, token: String) {
             it.cnpj.contains(busca.trim())
     }
 
-    PaginaGestao(
-        titulo = "Fornecedores",
-        subtitulo = "Cadastro de fornecedores e seus endereços.",
-        acao = { BotaoPrincipal("Novo fornecedor") { sucesso = null; emEdicao = null; formularioAberto = true } }
-    ) {
-        OutlinedTextField(
-            value = busca,
-            onValueChange = { busca = it },
-            label = { Text("Buscar por nome ou CNPJ") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = CorMarromEscuro,
-                focusedLabelColor = CorMarromEscuro
-            )
-        )
-        AvisoTela(erro, erro = true)
-        AvisoTela(sucesso, erro = false)
-        CarregandoOuVazio(
-            carregando,
-            filtrados.isEmpty(),
-            if (fornecedores.isEmpty()) "Nenhum fornecedor cadastrado." else "Nenhum fornecedor encontrado."
-        )
-
-        filtrados.forEach { fornecedor ->
-            CartaoItem {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(fornecedor.nome, fontWeight = FontWeight.SemiBold, color = CorMarromEscuro)
-                    Etiqueta(if (fornecedor.ativo) "Ativo" else "Inativo", fornecedor.ativo)
-                }
-                Text(
-                    "CNPJ ${fornecedor.cnpj}  |  ${fornecedor.email}  |  ${fornecedor.telefone}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = CorTextoSuave
+    // Navigation3, 2º nível: Listagem <-> Formulário
+    NavegacaoCrud<FornecedorResponse>(
+        chave = token,
+        listagem = { abrirFormulario ->
+        PaginaGestao(
+            titulo = "Fornecedores",
+            subtitulo = "Cadastro de fornecedores e seus endereços.",
+            acao = { BotaoPrincipal("Novo fornecedor") { sucesso = null; abrirFormulario(null) } }
+        ) {
+            OutlinedTextField(
+                value = busca,
+                onValueChange = { busca = it },
+                label = { Text("Buscar por nome ou CNPJ") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = CorMarromEscuro,
+                    focusedLabelColor = CorMarromEscuro
                 )
-                val enderecos = enderecosPorFornecedor[fornecedor.id].orEmpty()
-                if (enderecos.isEmpty()) {
-                    Text("Nenhum endereço cadastrado.", style = MaterialTheme.typography.bodySmall, color = CorTextoSuave)
-                } else {
-                    enderecos.forEach {
-                        Text(
-                            "Endereço: ${it.resumo()}" + if (it.principal) " (principal)" else "",
-                            style = MaterialTheme.typography.bodySmall
-                        )
+            )
+            AvisoTela(erro, erro = true)
+            AvisoTela(sucesso, erro = false)
+            CarregandoOuVazio(
+                carregando,
+                filtrados.isEmpty(),
+                if (fornecedores.isEmpty()) "Nenhum fornecedor cadastrado." else "Nenhum fornecedor encontrado."
+            )
+
+            filtrados.forEach { fornecedor ->
+                CartaoItem {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(fornecedor.nome, fontWeight = FontWeight.SemiBold, color = CorMarromEscuro)
+                        Etiqueta(if (fornecedor.ativo) "Ativo" else "Inativo", fornecedor.ativo)
                     }
-                }
-                // FlowRow: no celular os botões descem para a linha de baixo em vez de sair da tela
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    BotaoSecundario("Editar") { sucesso = null; emEdicao = fornecedor; formularioAberto = true }
-                    BotaoSecundario("Endereços") { sucesso = null; enderecosDe = fornecedor }
-                    BotaoSecundario(if (fornecedor.ativo) "Desativar" else "Ativar") {
-                        escopo.launch {
-                            api.alterarAtivo(token, fornecedor.id, !fornecedor.ativo)
-                                .onSuccess { sucesso = null; recarregar() }
-                                .onFailure { erro = it.message }
+                    Text(
+                        "CNPJ ${fornecedor.cnpj}  |  ${fornecedor.email}  |  ${fornecedor.telefone}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = CorTextoSuave
+                    )
+                    val enderecos = enderecosPorFornecedor[fornecedor.id].orEmpty()
+                    if (enderecos.isEmpty()) {
+                        Text("Nenhum endereço cadastrado.", style = MaterialTheme.typography.bodySmall, color = CorTextoSuave)
+                    } else {
+                        enderecos.forEach {
+                            Text(
+                                "Endereço: ${it.resumo()}" + if (it.principal) " (principal)" else "",
+                                style = MaterialTheme.typography.bodySmall
+                            )
                         }
                     }
-                    BotaoExcluir {
-                        escopo.launch {
-                            api.excluir(token, fornecedor.id)
-                                .onSuccess { sucesso = "Fornecedor excluído."; erro = null; recarregar() }
-                                .onFailure { erro = it.message ?: "Não foi possível excluir." }
+                    // FlowRow: no celular os botões descem para a linha de baixo em vez de sair da tela
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        BotaoSecundario("Editar") { sucesso = null; abrirFormulario(fornecedor) }
+                        BotaoSecundario("Endereços") { sucesso = null; enderecosDe = fornecedor }
+                        BotaoSecundario(if (fornecedor.ativo) "Desativar" else "Ativar") {
+                            escopo.launch {
+                                api.alterarAtivo(token, fornecedor.id, !fornecedor.ativo)
+                                    .onSuccess { sucesso = null; recarregar() }
+                                    .onFailure { erro = it.message }
+                            }
+                        }
+                        BotaoExcluir {
+                            escopo.launch {
+                                api.excluir(token, fornecedor.id)
+                                    .onSuccess { sucesso = "Fornecedor excluído."; erro = null; recarregar() }
+                                    .onFailure { erro = it.message ?: "Não foi possível excluir." }
+                            }
                         }
                     }
                 }
             }
         }
-    }
+        },
+        formulario = { item, voltarParaListagem ->
+            FormularioFornecedor(
+                inicial = item,
+                aoSalvar = { request ->
+                    val alvo = item
+                    (if (alvo == null) api.cadastrar(token, request) else api.atualizar(token, alvo.id, request))
+                        .onSuccess { salvo ->
+                            sucesso = if (alvo == null) "Fornecedor cadastrado. Agora cadastre o endereço." else "Fornecedor atualizado."
+                            recarregar() // antes de fechar: o formulário sai da tela e cancela o escopo dele
+                            voltarParaListagem()
+                            if (alvo == null) enderecosDe = salvo // novo fornecedor já segue para os endereços
+                        }
+                },
+                aoCancelar = voltarParaListagem
+            )
+        }
+    )
 }
 
 @Composable

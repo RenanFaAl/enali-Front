@@ -42,8 +42,6 @@ fun TelaEnderecos(
     var erro by remember(chave) { mutableStateOf<String?>(null) }
     var sucesso by remember(chave) { mutableStateOf<String?>(null) }
     // null = lista; id 0 = novo; id > 0 = edição
-    var emEdicao by remember(chave) { mutableStateOf<EnderecoResponse?>(null) }
-    var formularioAberto by remember(chave) { mutableStateOf(false) }
 
     suspend fun recarregar() {
         carregando = true
@@ -55,65 +53,55 @@ fun TelaEnderecos(
 
     LaunchedEffect(chave) { recarregar() }
 
-    if (formularioAberto && salvar != null) {
-        FormularioEndereco(
-            inicial = emEdicao,
-            aoSalvar = { request ->
-                salvar(emEdicao?.id, request).onSuccess {
-                    sucesso = if (emEdicao != null) "Endereço atualizado." else "Endereço cadastrado."
-                    recarregar() // antes de fechar: o formulário sai da tela e cancela o escopo dele
-                    formularioAberto = false
-                    emEdicao = null
-                }
-            },
-            aoCancelar = { formularioAberto = false; emEdicao = null }
-        )
-        return
-    }
 
-    PaginaGestao(
-        titulo = titulo,
-        subtitulo = subtitulo,
-        acao = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                aoVoltar?.let { BotaoSecundario("Voltar", aoClicar = it) }
-                if (salvar != null) {
-                    BotaoPrincipal("Novo endereço") { sucesso = null; emEdicao = null; formularioAberto = true }
+    // Navigation3, 2º nível: Listagem <-> Formulário
+    NavegacaoCrud<EnderecoResponse>(
+        chave = chave,
+        listagem = { abrirFormulario ->
+        PaginaGestao(
+            titulo = titulo,
+            subtitulo = subtitulo,
+            acao = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    aoVoltar?.let { BotaoSecundario("Voltar", aoClicar = it) }
+                    if (salvar != null) {
+                        BotaoPrincipal("Novo endereço") { sucesso = null; abrirFormulario(null) }
+                    }
                 }
             }
-        }
-    ) {
-        AvisoTela(erro, erro = true)
-        AvisoTela(sucesso, erro = false)
-        CarregandoOuVazio(carregando, enderecos.isEmpty(), "Nenhum endereço cadastrado.")
+        ) {
+            AvisoTela(erro, erro = true)
+            AvisoTela(sucesso, erro = false)
+            CarregandoOuVazio(carregando, enderecos.isEmpty(), "Nenhum endereço cadastrado.")
 
-        enderecos.forEach { endereco ->
-            CartaoItem {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        "${endereco.rua}, ${endereco.numero}",
-                        fontWeight = FontWeight.SemiBold,
-                        color = CorMarromEscuro
-                    )
-                    if (endereco.principal) Etiqueta("Principal", positiva = true)
-                    if (!endereco.ativo) Etiqueta("Inativo", positiva = false)
-                }
-                if (mostrarDono) endereco.dono?.let { Text(it, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium) }
-                Text(endereco.resumo(), style = MaterialTheme.typography.bodySmall, color = CorTextoSuave)
-                endereco.referencia?.takeIf { it.isNotBlank() }?.let {
-                    Text("Referência: $it", style = MaterialTheme.typography.bodySmall, color = CorTextoSuave)
-                }
-                if (salvar != null || excluir != null) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        if (salvar != null) {
-                            BotaoSecundario("Editar") { sucesso = null; emEdicao = endereco; formularioAberto = true }
-                        }
-                        if (excluir != null) {
-                            BotaoExcluir {
-                                escopo.launch {
-                                    excluir(endereco.id)
-                                        .onSuccess { sucesso = "Endereço excluído."; erro = null; recarregar() }
-                                        .onFailure { erro = it.message ?: "Não foi possível excluir." }
+            enderecos.forEach { endereco ->
+                CartaoItem {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "${endereco.rua}, ${endereco.numero}",
+                            fontWeight = FontWeight.SemiBold,
+                            color = CorMarromEscuro
+                        )
+                        if (endereco.principal) Etiqueta("Principal", positiva = true)
+                        if (!endereco.ativo) Etiqueta("Inativo", positiva = false)
+                    }
+                    if (mostrarDono) endereco.dono?.let { Text(it, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium) }
+                    Text(endereco.resumo(), style = MaterialTheme.typography.bodySmall, color = CorTextoSuave)
+                    endereco.referencia?.takeIf { it.isNotBlank() }?.let {
+                        Text("Referência: $it", style = MaterialTheme.typography.bodySmall, color = CorTextoSuave)
+                    }
+                    if (salvar != null || excluir != null) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            if (salvar != null) {
+                                BotaoSecundario("Editar") { sucesso = null; abrirFormulario(endereco) }
+                            }
+                            if (excluir != null) {
+                                BotaoExcluir {
+                                    escopo.launch {
+                                        excluir(endereco.id)
+                                            .onSuccess { sucesso = "Endereço excluído."; erro = null; recarregar() }
+                                            .onFailure { erro = it.message ?: "Não foi possível excluir." }
+                                    }
                                 }
                             }
                         }
@@ -121,7 +109,21 @@ fun TelaEnderecos(
                 }
             }
         }
-    }
+        },
+        formulario = { item, voltarParaListagem ->
+            if (salvar != null) FormularioEndereco(
+                inicial = item,
+                aoSalvar = { request ->
+                    salvar(item?.id, request).onSuccess {
+                        sucesso = if (item != null) "Endereço atualizado." else "Endereço cadastrado."
+                        recarregar() // antes de fechar: o formulário sai da tela e cancela o escopo dele
+                            voltarParaListagem()
+                    }
+                },
+                aoCancelar = voltarParaListagem
+            )
+        }
+    )
 }
 
 private fun formatarCep(valor: String): String {

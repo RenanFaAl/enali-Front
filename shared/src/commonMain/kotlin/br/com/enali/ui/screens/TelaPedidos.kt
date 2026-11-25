@@ -1,6 +1,11 @@
 package br.com.enali.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -23,7 +28,8 @@ fun TelaPedidos(
     chave: Any,
     mostrarCliente: Boolean,
     listar: suspend () -> Result<List<PedidoResponse>>,
-    cancelar: suspend (id: Long) -> Result<PedidoResponse>
+    cancelar: suspend (id: Long) -> Result<PedidoResponse>,
+    carregarFotos: (suspend (pedidoId: Long) -> List<ByteArray>)? = null
 ) {
     val escopo = rememberCoroutineScope()
     var pedidos by remember(chave) { mutableStateOf<List<PedidoResponse>>(emptyList()) }
@@ -110,6 +116,7 @@ fun TelaPedidos(
                 pedido.observacoes?.takeIf { it.isNotBlank() }?.let {
                     Text("Observações: $it", style = MaterialTheme.typography.bodySmall, color = CorTextoSuave)
                 }
+                carregarFotos?.let { FotosDoPedido(pedido.id, it) }
                 if (!pedido.cancelado) {
                     BotaoExcluir(texto = "Cancelar pedido", textoConfirmar = "Confirmar cancelamento") {
                         escopo.launch {
@@ -120,6 +127,25 @@ fun TelaPedidos(
                     }
                 }
             }
+        }
+    }
+}
+
+/** Miniaturas das fotos anexadas às observações do pedido (não mostra nada se não houver fotos). */
+@Composable
+private fun FotosDoPedido(pedidoId: Long, carregar: suspend (Long) -> List<ByteArray>) {
+    var fotos by remember(pedidoId) { mutableStateOf<List<ImageBitmap>>(emptyList()) }
+    LaunchedEffect(pedidoId) { fotos = carregar(pedidoId).mapNotNull { it.toComposeImageBitmap() } }
+    if (fotos.isEmpty()) return
+    Text("Fotos anexadas:", style = MaterialTheme.typography.bodySmall, color = CorTextoSuave)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        fotos.forEach {
+            Image(
+                bitmap = it,
+                contentDescription = "Foto anexada ao pedido",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(84.dp).clip(RoundedCornerShape(8.dp))
+            )
         }
     }
 }

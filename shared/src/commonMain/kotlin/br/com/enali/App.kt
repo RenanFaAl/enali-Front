@@ -7,6 +7,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.navigation3.runtime.NavEntry
+import androidx.navigation3.ui.NavDisplay
 import br.com.enali.auth.RotaEnali
 import br.com.enali.auth.SessaoUsuario
 import br.com.enali.model.Administrador
@@ -32,8 +34,24 @@ fun App() {
         mutableStateOf<SessaoUsuario>(SessaoUsuario.Visitante)
     }
 
-    var identificadorTelaAtual by remember {
-        mutableStateOf(RotaEnali.VISITANTE.rotaInicial)
+    // Navigation3, 1º nível: pilha de telas (CRUDs); o topo da pilha é a tela exibida
+    val pilhaTelas = remember { mutableStateListOf(RotaEnali.VISITANTE.rotaInicial) }
+    val identificadorTelaAtual = pilhaTelas.last()
+
+    // Menu lateral, login e logout: a tela escolhida vira a raiz da pilha
+    fun trocarRaiz(tela: String) {
+        pilhaTelas.clear()
+        pilhaTelas.add(tela)
+    }
+
+    // Navegação dentro de um fluxo (ex.: vitrine -> carrinho): empilha para o "voltar" funcionar
+    fun abrir(tela: String) {
+        val indice = pilhaTelas.indexOf(tela)
+        if (indice >= 0) {
+            while (pilhaTelas.size > indice + 1) pilhaTelas.removeAt(pilhaTelas.lastIndex)
+        } else {
+            pilhaTelas.add(tela)
+        }
     }
 
     val rotasPermitidas = remember(sessao) {
@@ -42,7 +60,7 @@ fun App() {
 
     LaunchedEffect(sessao, rotasPermitidas) {
         if (identificadorTelaAtual !in rotasPermitidas) {
-            identificadorTelaAtual = RotaEnali.daSessao(sessao).rotaInicial
+            trocarRaiz(RotaEnali.daSessao(sessao).rotaInicial)
         }
     }
 
@@ -66,12 +84,12 @@ fun App() {
     val aoSair = {
         itensCarrinho = emptyList()
         sessao = SessaoUsuario.Visitante
-        identificadorTelaAtual = RotaEnali.VISITANTE.rotaInicial
+        trocarRaiz(RotaEnali.VISITANTE.rotaInicial)
     }
 
     val aoLogarComSucesso: (SessaoUsuario) -> Unit = { novaSessao ->
         sessao = novaSessao
-        identificadorTelaAtual = RotaEnali.daSessao(novaSessao).rotaInicial
+        trocarRaiz(RotaEnali.daSessao(novaSessao).rotaInicial)
     }
 
     MaterialTheme(
@@ -136,13 +154,13 @@ fun App() {
                         telaAtual = identificadorTelaAtual,
                         aoMudarTela = { novaTela ->
                             if (novaTela in rotasPermitidas) {
-                                identificadorTelaAtual = novaTela
+                                trocarRaiz(novaTela)
                             }
                         },
                         aoSair = aoSair,
                         aoAbrirLoginAdminDiscreto = {
                             if (sessao is SessaoUsuario.Visitante) {
-                                identificadorTelaAtual = "LOGIN_ADMIN"
+                                abrir("LOGIN_ADMIN")
                             }
                         },
                         compacto = compacto
@@ -153,17 +171,22 @@ fun App() {
                             .weight(1f)
                             .fillMaxHeight()
                     ) {
-                        when (identificadorTelaAtual) {
+                        NavDisplay(
+                            backStack = pilhaTelas,
+                            onBack = { if (pilhaTelas.size > 1) pilhaTelas.removeAt(pilhaTelas.lastIndex) },
+                            entryProvider = { tela ->
+                                NavEntry(tela) {
+                        when (tela) {
                             "LOGIN_CLIENTE" -> TelaLoginCliente(
                                 apiClient = apiClient,
                                 aoLoginSucesso = {
                                     aoLogarComSucesso(it)
                                 },
                                 aoIrParaCadastro = {
-                                    identificadorTelaAtual = "CADASTRO_CLIENTE"
+                                    abrir("CADASTRO_CLIENTE")
                                 },
                                 aoIrParaLoginAdmin = {
-                                    identificadorTelaAtual = "LOGIN_ADMIN"
+                                    abrir("LOGIN_ADMIN")
                                 }
                             )
 
@@ -173,7 +196,7 @@ fun App() {
                                     aoLogarComSucesso(it)
                                 },
                                 aoVoltarCliente = {
-                                    identificadorTelaAtual = "LOGIN_CLIENTE"
+                                    abrir("LOGIN_CLIENTE")
                                 }
                             )
 
@@ -184,7 +207,7 @@ fun App() {
                                         listaDeClientes.value + novoCliente
                                 },
                                 aoVoltarLogin = {
-                                    identificadorTelaAtual = "LOGIN_CLIENTE"
+                                    abrir("LOGIN_CLIENTE")
                                 }
                             )
 
@@ -214,7 +237,7 @@ fun App() {
                                     }
                                 },
                                 aoAbrirCarrinho = {
-                                    identificadorTelaAtual = "CARRINHO"
+                                    abrir("CARRINHO")
                                 }
                             )
 
@@ -244,14 +267,14 @@ fun App() {
                                     }
                                 },
                                 aoVoltarVitrine = {
-                                    identificadorTelaAtual = "VITRINE"
+                                    abrir("VITRINE")
                                 },
                                 tokenCliente = (sessao as? SessaoUsuario.ClienteLogado)?.token,
-                                aoIrParaLogin = { identificadorTelaAtual = "LOGIN_CLIENTE" },
-                                aoIrParaEnderecos = { identificadorTelaAtual = "MEUS_ENDERECOS" },
+                                aoIrParaLogin = { abrir("LOGIN_CLIENTE") },
+                                aoIrParaEnderecos = { abrir("MEUS_ENDERECOS") },
                                 aoPedidoRealizado = {
                                     itensCarrinho = emptyList()
-                                    identificadorTelaAtual = "MEUS_PEDIDOS"
+                                    abrir("MEUS_PEDIDOS")
                                 }
                             )
 
@@ -262,7 +285,8 @@ fun App() {
                                     chave = s.token,
                                     mostrarCliente = false,
                                     listar = { apiClient.pedido.listarMeus(s.token) },
-                                    cancelar = { id -> apiClient.pedido.cancelarMeu(s.token, id) }
+                                    cancelar = { id -> apiClient.pedido.cancelarMeu(s.token, id) },
+                                    carregarFotos = { id -> carregarFotosPedido(apiClient, s.token, id, admin = false) }
                                 )
                             }
 
@@ -409,7 +433,8 @@ fun App() {
                                     chave = s.token,
                                     mostrarCliente = true,
                                     listar = { apiClient.pedido.listarTodos(s.token) },
-                                    cancelar = { id -> apiClient.pedido.cancelar(s.token, id) }
+                                    cancelar = { id -> apiClient.pedido.cancelar(s.token, id) },
+                                    carregarFotos = { id -> carregarFotosPedido(apiClient, s.token, id, admin = true) }
                                 )
                             }
 
@@ -421,9 +446,17 @@ fun App() {
                                 TelaFornecedores(apiClient = apiClient, token = s.token)
                             }
                         }
+                                }
+                            }
+                        )
                     }
                 }
             }
         }
     }
 }
+
+// Busca a lista de fotos do pedido e baixa cada uma; falhas viram lista vazia
+private suspend fun carregarFotosPedido(api: EnaliApiClient, token: String, pedidoId: Long, admin: Boolean): List<ByteArray> =
+    api.pedido.listarFotos(token, pedidoId, admin).getOrDefault(emptyList())
+        .mapNotNull { api.pedido.baixarFoto(token, pedidoId, it.id, admin).getOrNull() }

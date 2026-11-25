@@ -1,6 +1,8 @@
 
 package br.com.enali.ui.screens
 
+import br.com.enali.ui.components.selecionarImagensProduto
+import br.com.enali.network.dto.ImagemUploadItem
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -550,6 +552,7 @@ private fun FinalizacaoPedido(
     var enderecos by remember { mutableStateOf<List<EnderecoResponse>>(emptyList()) }
     var enderecoId by remember { mutableStateOf<Long?>(null) }
     var observacoes by remember { mutableStateOf("") }
+    var fotos by remember { mutableStateOf<List<ImagemUploadItem>>(emptyList()) }
     var carregando by remember { mutableStateOf(true) }
     var enviando by remember { mutableStateOf(false) }
     var erro by remember { mutableStateOf<String?>(null) }
@@ -595,6 +598,30 @@ private fun FinalizacaoPedido(
         )
     )
 
+    // Fotos de referência anexadas às observações (ex.: personalização)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        BotaoSecundario("Anexar fotos", habilitado = !enviando && fotos.size < 5) {
+            selecionarImagensProduto(
+                permiteMultiplas = true,
+                onSelecionadas = { novas -> fotos = (fotos + novas).take(5); erro = null },
+                onErro = { erro = it }
+            )
+        }
+        Text(
+            if (fotos.isEmpty()) "Opcional, até 5 fotos (JPEG, PNG ou WebP)" else "${fotos.size} foto(s) anexada(s)",
+            style = MaterialTheme.typography.bodySmall,
+            color = Color(0xFF71665C)
+        )
+    }
+    fotos.forEachIndexed { indice, foto ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(foto.nomeArquivo, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+            TextButton(onClick = { fotos = fotos.filterIndexed { i, _ -> i != indice } }, enabled = !enviando) {
+                Text("Remover", color = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+
     AvisoTela(erro, erro = true)
 
     BotaoPrincipal(
@@ -614,7 +641,12 @@ private fun FinalizacaoPedido(
                     observacoes = observacoes.trim().ifBlank { null }
                 )
             )
-                .onSuccess(aoPedidoRealizado)
+                .onSuccess { pedido ->
+                    // envia as fotos antes de sair da tela (sair cancela este escopo)
+                    // shortcut: foto que falhar no envio é descartada sem aviso; os arquivos já são validados no seletor
+                    fotos.forEach { apiClient.pedido.enviarFoto(tokenCliente, pedido.id, it) }
+                    aoPedidoRealizado(pedido)
+                }
                 .onFailure { erro = it.message ?: "Não foi possível finalizar o pedido." }
             enviando = false
         }

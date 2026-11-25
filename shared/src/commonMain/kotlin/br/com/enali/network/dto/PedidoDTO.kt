@@ -40,3 +40,10 @@ data class PedidoResponse(
 ) {
     val cancelado: Boolean get() = status.equals("CANCELADO", ignoreCase = true)
 }
+
+@Serializable
+data class PedidoImagemResponse(
+    val id: Long,
+    val pedidoId: Long,
+    val tipoMime: String
+)

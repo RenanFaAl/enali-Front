@@ -28,8 +28,6 @@ fun TelaMateriais(apiClient: EnaliApiClient, token: String) {
     var erro by remember { mutableStateOf<String?>(null) }
     var sucesso by remember { mutableStateOf<String?>(null) }
     var busca by remember { mutableStateOf("") }
-    var formularioAberto by remember { mutableStateOf(false) }
-    var emEdicao by remember { mutableStateOf<MaterialResponse?>(null) }
 
     suspend fun recarregar() {
         carregando = true
@@ -41,85 +39,89 @@ fun TelaMateriais(apiClient: EnaliApiClient, token: String) {
 
     LaunchedEffect(token) { recarregar() }
 
-    if (formularioAberto) {
-        FormularioMaterial(
-            inicial = emEdicao,
-            aoSalvar = { request ->
-                val alvo = emEdicao
-                (if (alvo == null) api.cadastrar(token, request) else api.atualizar(token, alvo.id, request))
-                    .onSuccess {
-                        sucesso = if (alvo == null) "Material cadastrado." else "Material atualizado."
-                        recarregar() // antes de fechar: o formulário sai da tela e cancela o escopo dele
-                        formularioAberto = false
-                        emEdicao = null
-                    }
-            },
-            aoCancelar = { formularioAberto = false; emEdicao = null }
-        )
-        return
-    }
 
     val filtrados = materiais.filter { busca.isBlank() || it.nome.contains(busca.trim(), ignoreCase = true) }
 
-    PaginaGestao(
-        titulo = "Materiais",
-        subtitulo = "Matéria-prima usada na produção.",
-        acao = { BotaoPrincipal("Novo material") { sucesso = null; emEdicao = null; formularioAberto = true } }
-    ) {
-        OutlinedTextField(
-            value = busca,
-            onValueChange = { busca = it },
-            label = { Text("Buscar material") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = CorMarromEscuro,
-                focusedLabelColor = CorMarromEscuro
-            )
-        )
-        AvisoTela(erro, erro = true)
-        AvisoTela(sucesso, erro = false)
-        CarregandoOuVazio(
-            carregando,
-            filtrados.isEmpty(),
-            if (materiais.isEmpty()) "Nenhum material cadastrado." else "Nenhum material encontrado."
-        )
-
-        filtrados.forEach { material ->
-            CartaoItem {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(material.nome, fontWeight = FontWeight.SemiBold, color = CorMarromEscuro)
-                    Etiqueta(if (material.disponivel) "Disponível" else "Indisponível", material.disponivel)
-                }
-                material.descricao?.takeIf { it.isNotBlank() }?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = CorTextoSuave)
-                }
-                Text(
-                    "Quantidade: ${material.quantidade}  |  Custo: ${formatarMoeda(material.custo)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = CorTextoSuave
+    // Navigation3, 2º nível: Listagem <-> Formulário
+    NavegacaoCrud<MaterialResponse>(
+        chave = token,
+        listagem = { abrirFormulario ->
+        PaginaGestao(
+            titulo = "Materiais",
+            subtitulo = "Matéria-prima usada na produção.",
+            acao = { BotaoPrincipal("Novo material") { sucesso = null; abrirFormulario(null) } }
+        ) {
+            OutlinedTextField(
+                value = busca,
+                onValueChange = { busca = it },
+                label = { Text("Buscar material") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = CorMarromEscuro,
+                    focusedLabelColor = CorMarromEscuro
                 )
-                // FlowRow: no celular os botões descem para a linha de baixo em vez de sair da tela
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    BotaoSecundario("Editar") { sucesso = null; emEdicao = material; formularioAberto = true }
-                    BotaoSecundario(if (material.disponivel) "Marcar indisponível" else "Marcar disponível") {
-                        escopo.launch {
-                            api.alterarDisponivel(token, material.id, !material.disponivel)
-                                .onSuccess { sucesso = null; recarregar() }
-                                .onFailure { erro = it.message }
-                        }
+            )
+            AvisoTela(erro, erro = true)
+            AvisoTela(sucesso, erro = false)
+            CarregandoOuVazio(
+                carregando,
+                filtrados.isEmpty(),
+                if (materiais.isEmpty()) "Nenhum material cadastrado." else "Nenhum material encontrado."
+            )
+
+            filtrados.forEach { material ->
+                CartaoItem {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(material.nome, fontWeight = FontWeight.SemiBold, color = CorMarromEscuro)
+                        Etiqueta(if (material.disponivel) "Disponível" else "Indisponível", material.disponivel)
                     }
-                    BotaoExcluir {
-                        escopo.launch {
-                            api.excluir(token, material.id)
-                                .onSuccess { sucesso = "Material excluído."; erro = null; recarregar() }
-                                .onFailure { erro = it.message ?: "Não foi possível excluir." }
+                    material.descricao?.takeIf { it.isNotBlank() }?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = CorTextoSuave)
+                    }
+                    Text(
+                        "Quantidade: ${material.quantidade}  |  Custo: ${formatarMoeda(material.custo)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = CorTextoSuave
+                    )
+                    // FlowRow: no celular os botões descem para a linha de baixo em vez de sair da tela
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        BotaoSecundario("Editar") { sucesso = null; abrirFormulario(material) }
+                        BotaoSecundario(if (material.disponivel) "Marcar indisponível" else "Marcar disponível") {
+                            escopo.launch {
+                                api.alterarDisponivel(token, material.id, !material.disponivel)
+                                    .onSuccess { sucesso = null; recarregar() }
+                                    .onFailure { erro = it.message }
+                            }
+                        }
+                        BotaoExcluir {
+                            escopo.launch {
+                                api.excluir(token, material.id)
+                                    .onSuccess { sucesso = "Material excluído."; erro = null; recarregar() }
+                                    .onFailure { erro = it.message ?: "Não foi possível excluir." }
+                            }
                         }
                     }
                 }
             }
         }
-    }
+        },
+        formulario = { item, voltarParaListagem ->
+            FormularioMaterial(
+                inicial = item,
+                aoSalvar = { request ->
+                    val alvo = item
+                    (if (alvo == null) api.cadastrar(token, request) else api.atualizar(token, alvo.id, request))
+                        .onSuccess {
+                            sucesso = if (alvo == null) "Material cadastrado." else "Material atualizado."
+                            recarregar() // antes de fechar: o formulário sai da tela e cancela o escopo dele
+                            voltarParaListagem()
+                        }
+                },
+                aoCancelar = voltarParaListagem
+            )
+        }
+    )
 }
 
 @Composable
