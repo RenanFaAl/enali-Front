@@ -9,52 +9,52 @@ import br.com.enali.network.dto.AuthLoginResponse
 import br.com.enali.network.dto.ClienteAtualizarRequest
 import br.com.enali.network.dto.ClienteCadastroRequest
 import br.com.enali.network.dto.ClientePerfilResponse
-import br.com.enali.network.services.AdminApiService
-import br.com.enali.network.services.AuthApiService
-import br.com.enali.network.services.ClienteApiService
+import br.com.enali.network.services.AdminApiRepository
+import br.com.enali.network.services.AuthApiRepository
+import br.com.enali.network.services.ClienteApiRepository
 import br.com.enali.network.dto.ImagemUploadItem
 import br.com.enali.network.dto.ProdutoImagemResponse
 import br.com.enali.network.dto.ProdutoRequest
 import br.com.enali.network.dto.ProdutoResponse
-import br.com.enali.network.services.ProdutoApiService
+import br.com.enali.network.services.ProdutoApiRepository
 import br.com.enali.network.dto.EstoqueRequest
 import br.com.enali.network.dto.EstoqueResponse
-import br.com.enali.network.services.EstoqueApiService
+import br.com.enali.network.services.EstoqueApiRepository
 import io.ktor.client.HttpClient
 
 class EnaliApiClient(
     private val baseUrl: String = EnaliConfig.BASE_URL,
     private val httpClient: HttpClient = EnaliHttpClientFactory.criar()
 ) {
-    val auth: AuthApiService = AuthApiService(
+    val auth: AuthApiRepository = AuthApiRepository(
         httpClient = httpClient,
         baseUrl = baseUrl
     )
 
-    val admin: AdminApiService = AdminApiService(
+    val admin: AdminApiRepository = AdminApiRepository(
         httpClient = httpClient,
         baseUrl = baseUrl
     )
 
-    val cliente: ClienteApiService = ClienteApiService(
+    val cliente: ClienteApiRepository = ClienteApiRepository(
+        httpClient = httpClient,
+        baseUrl = baseUrl
+    )
+
+    val produto: ProdutoApiRepository = ProdutoApiRepository(
         httpClient = httpClient,
         baseUrl = baseUrl
     )
     
-    val produto: ProdutoApiService = ProdutoApiService(
-        httpClient = httpClient,
-        baseUrl = baseUrl
-    )
-    
-    val estoque: EstoqueApiService = EstoqueApiService(
+    val estoque: EstoqueApiRepository = EstoqueApiRepository(
         httpClient = httpClient,
         baseUrl = baseUrl
     )
 
-    val endereco = br.com.enali.network.services.EnderecoApiService(httpClient, baseUrl)
-    val pedido = br.com.enali.network.services.PedidoApiService(httpClient, baseUrl)
-    val material = br.com.enali.network.services.MaterialApiService(httpClient, baseUrl)
-    val fornecedor = br.com.enali.network.services.FornecedorApiService(httpClient, baseUrl)
+    val endereco = br.com.enali.network.services.EnderecoApiRepository(httpClient, baseUrl)
+    val pedido = br.com.enali.network.services.PedidoApiRepository(httpClient, baseUrl)
+    val material = br.com.enali.network.services.MaterialApiRepository(httpClient, baseUrl)
+    val fornecedor = br.com.enali.network.services.FornecedorApiRepository(httpClient, baseUrl)
 
     suspend fun loginCliente(email: String, senha: String): Result<AuthLoginResponse> =
         auth.loginCliente(email, senha)
