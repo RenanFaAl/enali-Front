@@ -11,11 +11,7 @@ import br.com.enali.auth.RotaEnali
 import br.com.enali.auth.SessaoUsuario
 import br.com.enali.model.Administrador
 import br.com.enali.model.Cliente
-import br.com.enali.model.Endereco
 import br.com.enali.model.Estoque
-import br.com.enali.model.Fornecedor
-import br.com.enali.model.Material
-import br.com.enali.model.Pedido
 import br.com.enali.model.Produto
 import br.com.enali.network.EnaliApiClient
 import br.com.enali.ui.components.BarraLateral
@@ -53,9 +49,6 @@ fun App() {
     val listaDeAdministradores = remember {
         mutableStateOf(listOf<Administrador>())
     }
-    val listaDeEnderecos = remember {
-        mutableStateOf(listOf<Endereco>())
-    }
     val listaDeProdutos = remember {
         mutableStateOf(listOf<Produto>())
     }
@@ -64,15 +57,6 @@ fun App() {
     }
     val listaDeClientes = remember {
         mutableStateOf(listOf<Cliente>())
-    }
-    val listaDePedidos = remember {
-        mutableStateOf(listOf<Pedido>())
-    }
-    val listaDeMateriais = remember {
-        mutableStateOf(listOf<Material>())
-    }
-    val listaDeFornecedores = remember {
-        mutableStateOf(listOf<Fornecedor>())
     }
 
     var itensCarrinho by remember {
@@ -261,15 +245,40 @@ fun App() {
                                 },
                                 aoVoltarVitrine = {
                                     identificadorTelaAtual = "VITRINE"
+                                },
+                                tokenCliente = (sessao as? SessaoUsuario.ClienteLogado)?.token,
+                                aoIrParaLogin = { identificadorTelaAtual = "LOGIN_CLIENTE" },
+                                aoIrParaEnderecos = { identificadorTelaAtual = "MEUS_ENDERECOS" },
+                                aoPedidoRealizado = {
+                                    itensCarrinho = emptyList()
+                                    identificadorTelaAtual = "MEUS_PEDIDOS"
                                 }
                             )
 
-                            "MEUS_PEDIDOS", "MEUS_ENDERECOS" -> Text(
-                                text = "Área: $identificadorTelaAtual",
-                                color = CorMarromEscuro,
-                                style = MaterialTheme.typography.headlineSmall,
-                                modifier = Modifier.padding(24.dp)
-                            )
+                            "MEUS_PEDIDOS" -> (sessao as? SessaoUsuario.ClienteLogado)?.let { s ->
+                                TelaPedidos(
+                                    titulo = "Meus pedidos",
+                                    subtitulo = "Acompanhe e cancele seus pedidos.",
+                                    chave = s.token,
+                                    mostrarCliente = false,
+                                    listar = { apiClient.pedido.listarMeus(s.token) },
+                                    cancelar = { id -> apiClient.pedido.cancelarMeu(s.token, id) }
+                                )
+                            }
+
+                            "MEUS_ENDERECOS" -> (sessao as? SessaoUsuario.ClienteLogado)?.let { s ->
+                                TelaEnderecos(
+                                    titulo = "Meus endereços",
+                                    subtitulo = "Endereços de entrega dos seus pedidos.",
+                                    chave = s.token,
+                                    listar = { apiClient.endereco.listarMeus(s.token) },
+                                    salvar = { id, request ->
+                                        if (id == null) apiClient.endereco.cadastrarMeu(s.token, request)
+                                        else apiClient.endereco.atualizarMeu(s.token, id, request)
+                                    },
+                                    excluir = { id -> apiClient.endereco.excluirMeu(s.token, id) }
+                                )
+                            }
 
                             "MEU_CADASTRO" -> {
                                 val s = sessao as? SessaoUsuario.ClienteLogado
@@ -327,12 +336,15 @@ fun App() {
                                 }
                             }
 
-                            "ENDERECO" -> TelaFormularioEndereco(
-                                aoSalvar = { novoEndereco ->
-                                    listaDeEnderecos.value =
-                                        listaDeEnderecos.value + novoEndereco
-                                }
-                            )
+                            "ENDERECO" -> (sessao as? SessaoUsuario.AdminLogado)?.let { s ->
+                                TelaEnderecos(
+                                    titulo = "Endereços",
+                                    subtitulo = "Todos os endereços cadastrados (consulta).",
+                                    chave = s.token,
+                                    listar = { apiClient.endereco.listarTodos(s.token) },
+                                    mostrarDono = true
+                                )
+                            }
 
                             "PRODUTO" -> {
                                 val sessaoAdmin =
@@ -390,26 +402,24 @@ fun App() {
                                 }
                             )
 
-                            "PEDIDO" -> TelaFormularioPedido(
-                                aoSalvar = { novoPedido ->
-                                    listaDePedidos.value =
-                                        listaDePedidos.value + novoPedido
-                                }
-                            )
+                            "PEDIDO" -> (sessao as? SessaoUsuario.AdminLogado)?.let { s ->
+                                TelaPedidos(
+                                    titulo = "Pedidos",
+                                    subtitulo = "Todos os pedidos dos clientes.",
+                                    chave = s.token,
+                                    mostrarCliente = true,
+                                    listar = { apiClient.pedido.listarTodos(s.token) },
+                                    cancelar = { id -> apiClient.pedido.cancelar(s.token, id) }
+                                )
+                            }
 
-                            "MATERIAL" -> TelaFormularioMaterial(
-                                aoSalvar = { novoMaterial ->
-                                    listaDeMateriais.value =
-                                        listaDeMateriais.value + novoMaterial
-                                }
-                            )
+                            "MATERIAL" -> (sessao as? SessaoUsuario.AdminLogado)?.let { s ->
+                                TelaMateriais(apiClient = apiClient, token = s.token)
+                            }
 
-                            "FORNECEDOR" -> TelaFormularioFornecedor(
-                                aoSalvar = { novoFornecedor ->
-                                    listaDeFornecedores.value =
-                                        listaDeFornecedores.value + novoFornecedor
-                                }
-                            )
+                            "FORNECEDOR" -> (sessao as? SessaoUsuario.AdminLogado)?.let { s ->
+                                TelaFornecedores(apiClient = apiClient, token = s.token)
+                            }
                         }
                     }
                 }

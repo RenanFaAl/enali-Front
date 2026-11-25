@@ -28,7 +28,14 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import br.com.enali.network.EnaliApiClient
+import br.com.enali.network.dto.EnderecoResponse
+import br.com.enali.network.dto.ItemPedidoRequest
+import br.com.enali.network.dto.PedidoRequest
+import br.com.enali.network.dto.PedidoResponse
 import br.com.enali.network.dto.ProdutoResponse
+import br.com.enali.ui.components.AvisoTela
+import br.com.enali.ui.components.BotaoPrincipal
+import br.com.enali.ui.components.BotaoSecundario
 import br.com.enali.ui.components.toComposeImageBitmap
 import br.com.enali.ui.theme.CorBegeMedio
 import br.com.enali.ui.theme.CorBranco
@@ -82,7 +89,7 @@ private fun ImagemDaLoja(
             Image(
                 bitmap = bitmap,
                 contentDescription = "Imagem de ${produto.nome}",
-                contentScale = ContentScale.Crop,
+                contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize()
             )
         } else {
@@ -129,13 +136,6 @@ fun TelaVitrineEnali(
                 produto.nome.contains(busca.trim(), ignoreCase = true) ||
                 produto.descricao.contains(busca.trim(), ignoreCase = true)
         )
-    }
-
-    val lista = rememberLazyListState()
-    val escopo = rememberCoroutineScope()
-
-    LaunchedEffect(busca, disponiveis.size) {
-        lista.scrollToItem(0)
     }
 
     Column(
@@ -243,79 +243,24 @@ fun TelaVitrineEnali(
         }
 
         if (disponiveis.isNotEmpty()) {
-            BoxWithConstraints(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                val quantidadeVisivel = when {
-                    maxWidth >= 1080.dp -> 3
-                    maxWidth >= 690.dp -> 2
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val colunas = when {
+                    maxWidth >= 900.dp -> 3
+                    maxWidth >= 600.dp -> 2
                     else -> 1
                 }
-
-                val larguraLista = maxWidth - 88.dp
-                val larguraCard = (
-                    larguraLista - 14.dp * (quantidadeVisivel - 1)
-                ) / quantidadeVisivel
-
-                val ultimoIndice =
-                    (disponiveis.size - quantidadeVisivel).coerceAtLeast(0)
-
-                val indiceAtual =
-                    lista.firstVisibleItemIndex.coerceAtMost(ultimoIndice)
-
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            "Produtos (${disponiveis.size})",
-                            color = CorMarromEscuro,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-
-                        Text(
-                            "${indiceAtual + 1} de ${ultimoIndice + 1}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF71665C)
-                        )
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        IconButton(
-                            onClick = {
-                                escopo.launch {
-                                    lista.animateScrollToItem(
-                                        (indiceAtual - 1).coerceAtLeast(0)
-                                    )
-                                }
-                            },
-                            enabled = indiceAtual > 0
-                        ) {
-                            Icon(
-                                Icons.Default.ChevronLeft,
-                                contentDescription = "Produto anterior"
-                            )
-                        }
-
-                        LazyRow(
-                            state = lista,
-                            modifier = Modifier.weight(1f),
-                            horizontalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            items(
-                                disponiveis,
-                                key = { it.id }
-                            ) { produto ->
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Text(
+                        "Produtos (${disponiveis.size})",
+                        color = CorMarromEscuro,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    disponiveis.chunked(colunas).forEach { fileira ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                            fileira.forEach { produto ->
                                 Surface(
-                                    modifier = Modifier.width(larguraCard),
+                                    modifier = Modifier.weight(1f),
                                     color = CorBranco,
                                     shape = RoundedCornerShape(11.dp),
                                     border = BorderStroke(
@@ -332,7 +277,7 @@ fun TelaVitrineEnali(
                                             produto = produto,
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .height(155.dp)
+                                                .height(200.dp)
                                         )
 
                                         Column(
@@ -362,14 +307,13 @@ fun TelaVitrineEnali(
                                                 overflow = TextOverflow.Ellipsis
                                             )
 
-                                            if (produto.desconto > 0) {
-                                                Text(
-                                                    formatarMoedaLoja(produto.preco),
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = Color(0xFF71665C),
-                                                    textDecoration = TextDecoration.LineThrough
-                                                )
-                                            }
+                                            // linha sempre presente para todos os cards terem a mesma altura
+                                            Text(
+                                                if (produto.desconto > 0) formatarMoedaLoja(produto.preco) else "",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = Color(0xFF71665C),
+                                                textDecoration = TextDecoration.LineThrough
+                                            )
 
                                             Text(
                                                 formatarMoedaLoja(
@@ -401,22 +345,8 @@ fun TelaVitrineEnali(
                                     }
                                 }
                             }
-                        }
-
-                        IconButton(
-                            onClick = {
-                                escopo.launch {
-                                    lista.animateScrollToItem(
-                                        (indiceAtual + 1).coerceAtMost(ultimoIndice)
-                                    )
-                                }
-                            },
-                            enabled = indiceAtual < ultimoIndice
-                        ) {
-                            Icon(
-                                Icons.Default.ChevronRight,
-                                contentDescription = "Próximo produto"
-                            )
+                            // completa a última fileira para os cards manterem a mesma largura
+                            repeat(colunas - fileira.size) { Spacer(Modifier.weight(1f)) }
                         }
                     }
                 }
@@ -431,7 +361,11 @@ fun TelaCarrinhoEnali(
     itens: List<ItemCarrinhoEnali>,
     aoAlterarQuantidade: (Long, Int) -> Unit,
     aoRemover: (Long) -> Unit,
-    aoVoltarVitrine: () -> Unit
+    aoVoltarVitrine: () -> Unit,
+    tokenCliente: String?,
+    aoIrParaLogin: () -> Unit,
+    aoIrParaEnderecos: () -> Unit,
+    aoPedidoRealizado: (PedidoResponse) -> Unit
 ) {
     val total = itens.sumOf {
         valorFinalLoja(it.produto) * it.quantidade
@@ -579,11 +513,105 @@ fun TelaCarrinhoEnali(
                 )
             }
 
-            Text(
-                "A finalização dos pedidos será conectada à API depois.",
-                color = Color(0xFF71665C),
-                style = MaterialTheme.typography.bodySmall
+            FinalizacaoPedido(
+                apiClient = apiClient,
+                tokenCliente = tokenCliente,
+                itens = itens,
+                aoIrParaLogin = aoIrParaLogin,
+                aoIrParaEnderecos = aoIrParaEnderecos,
+                aoPedidoRealizado = aoPedidoRealizado
             )
+        }
+    }
+}
+
+// Fecha o pedido: cliente escolhe um endereço cadastrado e envia os itens do carrinho para a API
+@Composable
+private fun FinalizacaoPedido(
+    apiClient: EnaliApiClient,
+    tokenCliente: String?,
+    itens: List<ItemCarrinhoEnali>,
+    aoIrParaLogin: () -> Unit,
+    aoIrParaEnderecos: () -> Unit,
+    aoPedidoRealizado: (PedidoResponse) -> Unit
+) {
+    if (tokenCliente == null) {
+        Text("Entre na sua conta para finalizar o pedido.", color = Color(0xFF71665C))
+        BotaoPrincipal("Entrar para finalizar", aoClicar = aoIrParaLogin)
+        return
+    }
+
+    val escopo = rememberCoroutineScope()
+    var enderecos by remember { mutableStateOf<List<EnderecoResponse>>(emptyList()) }
+    var enderecoId by remember { mutableStateOf<Long?>(null) }
+    var observacoes by remember { mutableStateOf("") }
+    var carregando by remember { mutableStateOf(true) }
+    var enviando by remember { mutableStateOf(false) }
+    var erro by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(tokenCliente) {
+        apiClient.endereco.listarMeus(tokenCliente)
+            .onSuccess { lista ->
+                enderecos = lista.filter { it.ativo }
+                enderecoId = (enderecos.firstOrNull { it.principal } ?: enderecos.firstOrNull())?.id
+            }
+            .onFailure { erro = it.message ?: "Não foi possível carregar seus endereços." }
+        carregando = false
+    }
+
+    Text("Endereço de entrega", fontWeight = FontWeight.SemiBold, color = CorMarromEscuro)
+
+    if (carregando) {
+        LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = CorMarromEscuro)
+    } else if (enderecos.isEmpty()) {
+        Text("Você ainda não tem endereço cadastrado.", color = Color(0xFF71665C))
+        BotaoSecundario("Cadastrar endereço", aoClicar = aoIrParaEnderecos)
+    } else {
+        enderecos.forEach { endereco ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(
+                    selected = enderecoId == endereco.id,
+                    onClick = { enderecoId = endereco.id },
+                    colors = RadioButtonDefaults.colors(selectedColor = CorMarromEscuro)
+                )
+                Text(endereco.resumo(), style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+
+    OutlinedTextField(
+        value = observacoes,
+        onValueChange = { observacoes = it },
+        label = { Text("Observações (opcional)") },
+        modifier = Modifier.fillMaxWidth(),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = CorMarromEscuro,
+            focusedLabelColor = CorMarromEscuro
+        )
+    )
+
+    AvisoTela(erro, erro = true)
+
+    BotaoPrincipal(
+        if (enviando) "Enviando pedido..." else "Finalizar pedido",
+        habilitado = !enviando && enderecoId != null,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        val idEndereco = enderecoId ?: return@BotaoPrincipal
+        escopo.launch {
+            enviando = true
+            erro = null
+            apiClient.pedido.realizar(
+                tokenCliente,
+                PedidoRequest(
+                    enderecoId = idEndereco,
+                    itens = itens.map { ItemPedidoRequest(it.produto.id, it.quantidade) },
+                    observacoes = observacoes.trim().ifBlank { null }
+                )
+            )
+                .onSuccess(aoPedidoRealizado)
+                .onFailure { erro = it.message ?: "Não foi possível finalizar o pedido." }
+            enviando = false
         }
     }
 }

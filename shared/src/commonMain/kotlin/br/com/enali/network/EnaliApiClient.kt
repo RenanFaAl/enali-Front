@@ -51,6 +51,11 @@ class EnaliApiClient(
         baseUrl = baseUrl
     )
 
+    val endereco = br.com.enali.network.services.EnderecoApiService(httpClient, baseUrl)
+    val pedido = br.com.enali.network.services.PedidoApiService(httpClient, baseUrl)
+    val material = br.com.enali.network.services.MaterialApiService(httpClient, baseUrl)
+    val fornecedor = br.com.enali.network.services.FornecedorApiService(httpClient, baseUrl)
+
     suspend fun loginCliente(email: String, senha: String): Result<AuthLoginResponse> =
         auth.loginCliente(email, senha)
 
