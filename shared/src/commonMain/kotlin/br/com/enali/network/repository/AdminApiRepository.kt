@@ -1,4 +1,4 @@
-package br.com.enali.network.services
+package br.com.enali.network.repository
 
 import br.com.enali.network.EnaliConfig
 import br.com.enali.network.EnaliHttpClientFactory
@@ -18,7 +18,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 
-class AdminApiService(
+class AdminApiRepository(
     private val httpClient: HttpClient,
     private val baseUrl: String = EnaliConfig.BASE_URL
 ) {

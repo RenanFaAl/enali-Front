@@ -1,4 +1,4 @@
-package br.com.enali.network.services
+package br.com.enali.network.repository
 
 import br.com.enali.network.EnaliConfig
 import br.com.enali.network.EnaliHttpClientFactory
@@ -25,7 +25,7 @@ import io.ktor.http.contentType
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-class ProdutoApiService(
+class ProdutoApiRepository(
     private val httpClient: HttpClient,
     private val baseUrl: String = EnaliConfig.BASE_URL
 ) {

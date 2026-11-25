@@ -1,4 +1,4 @@
-package br.com.enali.network.services
+package br.com.enali.network.repository
 
 import br.com.enali.network.EnaliHttpClientFactory
 import io.ktor.client.call.body

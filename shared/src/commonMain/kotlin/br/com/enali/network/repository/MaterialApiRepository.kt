@@ -1,4 +1,4 @@
-package br.com.enali.network.services
+package br.com.enali.network.repository
 
 import br.com.enali.network.EnaliConfig
 import br.com.enali.network.dto.DisponivelRequest
@@ -11,7 +11,7 @@ import io.ktor.client.request.patch
 import io.ktor.client.request.post
 import io.ktor.client.request.put
 
-class MaterialApiService(
+class MaterialApiRepository(
     private val httpClient: HttpClient,
     private val baseUrl: String = EnaliConfig.BASE_URL
 ) {

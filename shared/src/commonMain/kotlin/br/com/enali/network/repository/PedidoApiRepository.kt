@@ -1,4 +1,4 @@
-package br.com.enali.network.services
+package br.com.enali.network.repository
 
 import br.com.enali.network.EnaliConfig
 import br.com.enali.network.dto.PedidoRequest
@@ -8,7 +8,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.patch
 import io.ktor.client.request.post
 
-class PedidoApiService(
+class PedidoApiRepository(
     private val httpClient: HttpClient,
     private val baseUrl: String = EnaliConfig.BASE_URL
 ) {
