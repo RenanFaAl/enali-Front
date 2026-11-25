@@ -124,6 +124,16 @@ fun TelaEnderecos(
     }
 }
 
+private fun formatarCep(valor: String): String {
+    val numeros = valor.filter { it.isDigit() }.take(8)
+
+    return if (numeros.length > 5) {
+        "${numeros.substring(0, 5)}-${numeros.substring(5)}"
+    } else {
+        numeros
+    }
+}
+
 @Composable
 fun FormularioEndereco(
     inicial: EnderecoResponse?,
@@ -131,7 +141,7 @@ fun FormularioEndereco(
     aoCancelar: () -> Unit
 ) {
     val escopo = rememberCoroutineScope()
-    var cep by remember { mutableStateOf(inicial?.cep ?: "") }
+    var cep by remember {mutableStateOf(formatarCep(inicial?.cep ?: ""))}
     var rua by remember { mutableStateOf(inicial?.rua ?: "") }
     var numero by remember { mutableStateOf(inicial?.numero ?: "") }
     var complemento by remember { mutableStateOf(inicial?.complemento ?: "") }
