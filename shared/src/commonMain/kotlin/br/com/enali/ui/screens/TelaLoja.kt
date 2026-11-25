@@ -146,12 +146,14 @@ fun TelaVitrineEnali(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val telaEstreita = maxWidth < 500.dp // celular: carrinho só com o ícone
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     "Loja Enali",
                     style = MaterialTheme.typography.headlineMedium,
@@ -173,17 +175,20 @@ fun TelaVitrineEnali(
             ) {
                 Icon(
                     Icons.Default.ShoppingCart,
-                    contentDescription = null,
+                    contentDescription = if (telaEstreita) "Carrinho ($quantidadeCarrinho)" else null,
                     tint = CorMarromEscuro
                 )
 
-                Spacer(Modifier.width(8.dp))
+                if (!telaEstreita) {
+                    Spacer(Modifier.width(8.dp))
 
-                Text(
-                    "Carrinho ($quantidadeCarrinho)",
-                    color = CorMarromEscuro
-                )
+                    Text(
+                        "Carrinho ($quantidadeCarrinho)",
+                        color = CorMarromEscuro
+                    )
+                }
             }
+        }
         }
 
         Row(

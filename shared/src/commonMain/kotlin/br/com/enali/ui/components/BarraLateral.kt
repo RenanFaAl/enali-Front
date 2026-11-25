@@ -1,6 +1,9 @@
 package br.com.enali.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -156,17 +159,16 @@ fun BarraLateral(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = if (compacto) "E" else "Enali",
-            style = if (compacto) {
-                MaterialTheme.typography.headlineMedium
-            } else {
-                MaterialTheme.typography.headlineSmall
-            },
-            fontWeight = FontWeight.Bold,
-            color = CorBranco,
+        // fundo branco porque as imagens da marca têm fundo claro
+        Image(
+            painter = if (compacto) iconeEnali() else logoEnali(),
+            contentDescription = "Enali",
+            contentScale = ContentScale.Fit,
             modifier = Modifier
-                .padding(top = 24.dp, bottom = 22.dp)
+                .padding(top = 18.dp, bottom = 16.dp)
+                .size(width = if (compacto) 64.dp else 166.dp, height = if (compacto) 64.dp else 90.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(CorBranco)
                 .clickable(enabled = sessao is SessaoUsuario.Visitante) {
                     toquesLogo += 1
                     if (toquesLogo >= 5) {

@@ -1,6 +1,7 @@
 package br.com.enali.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -17,6 +18,7 @@ import br.com.enali.ui.components.*
 import br.com.enali.ui.theme.CorMarromEscuro
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TelaMateriais(apiClient: EnaliApiClient, token: String) {
     val api = apiClient.material
@@ -97,7 +99,8 @@ fun TelaMateriais(apiClient: EnaliApiClient, token: String) {
                     style = MaterialTheme.typography.bodySmall,
                     color = CorTextoSuave
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                // FlowRow: no celular os botões descem para a linha de baixo em vez de sair da tela
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     BotaoSecundario("Editar") { sucesso = null; emEdicao = material; formularioAberto = true }
                     BotaoSecundario(if (material.disponivel) "Marcar indisponível" else "Marcar disponível") {
                         escopo.launch {

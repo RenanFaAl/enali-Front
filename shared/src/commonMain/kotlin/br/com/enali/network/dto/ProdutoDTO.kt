@@ -39,8 +39,7 @@ data class ImagemUploadItem(
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-        other as ImagemUploadItem
+        if (other !is ImagemUploadItem) return false
         return nomeArquivo == other.nomeArquivo &&
             tipoMime == other.tipoMime &&
             bytes.contentEquals(other.bytes)

@@ -1,6 +1,7 @@
 package br.com.enali.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -18,6 +19,7 @@ import br.com.enali.ui.components.*
 import br.com.enali.ui.theme.CorMarromEscuro
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TelaFornecedores(apiClient: EnaliApiClient, token: String) {
     val api = apiClient.fornecedor
@@ -135,7 +137,8 @@ fun TelaFornecedores(apiClient: EnaliApiClient, token: String) {
                         )
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                // FlowRow: no celular os botões descem para a linha de baixo em vez de sair da tela
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     BotaoSecundario("Editar") { sucesso = null; emEdicao = fornecedor; formularioAberto = true }
                     BotaoSecundario("Endereços") { sucesso = null; enderecosDe = fornecedor }
                     BotaoSecundario(if (fornecedor.ativo) "Desativar" else "Ativar") {
